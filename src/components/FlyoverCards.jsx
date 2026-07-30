@@ -34,12 +34,12 @@ export default function FlyoverCard({
   id
 }) {
   const handleMapClick = (lat, lng) => {
-    console.log(`Map clicked on ${highway}:`, lat, lng);
+    //console.log(`Map clicked on ${highway}:`, lat, lng);
     if (onMapClick) {
       onMapClick(lat, lng, id);
     }
   };
-
+//console.log("Popup render:", { weather, weatherLoading });
   const RiskIcon = riskIcon[riskStatus];
 
   return (
