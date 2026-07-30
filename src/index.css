@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563EB;
+  --color-secondary: #0EA5E9;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-dashboard: #F5F7FB;
+  --color-card: #FFFFFF;
+
+  --radius-xl2: 20px;
+
+  --shadow-card: 0 10px 25px rgba(0,0,0,0.08);
+}
+
+/* Mobile responsive utilities */
+@layer utilities {
+
+    /* Extra small screens (phones) */
+    @media (max-width: 480px) {
+        .xs\:block {
+            display: block;
+        }
+
+        .xs\:inline {
+            display: inline;
+        }
+
+        .xs\:hidden {
+            display: none;
+        }
+
+        .xs\:h-56 {
+            height: 14rem;
+        }
+    }
+}
+
+/* Smooth sidebar transitions */
+.sidebar-transition {
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Custom scrollbar for better mobile experience */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Prevent text selection on mobile */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  background: #f5f7fb;
+}
