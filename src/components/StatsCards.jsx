@@ -29,7 +29,7 @@ const cardConfig = [
     key: "high",
     label: "High Risk",
     icon: ShieldAlert,
-    accent: "border-danger",
+     accent: "border-red-500",
     iconBg: "bg-danger/10",
     iconColor: "text-danger",
   },

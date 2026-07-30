@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Maximize2, Minimize2, CloudRain, Cloud, Sun, Wind, Droplets, Loader2 } from "lucide-react";
+import { Maximize2, Minimize2, CloudRain, Cloud, Sun, Wind, Droplets, Eye, Loader2 } from "lucide-react";
 import { createRoot } from "react-dom/client";
 
 function ResizeHandler() {
@@ -16,18 +16,68 @@ function ResizeHandler() {
   return null;
 }
 
+// Deliberately re-focuses the map on the layer's full extent the moment
+// this card enters fullscreen — the zoom/center chosen for the small card
+// view rarely makes sense once the container is the whole screen. Restores
+// the pre-fullscreen view on exit so the card looks the same as before.
+function FullscreenFit({ geojson, isFullscreen }) {
+  const map = useMap();
+  const prevViewRef = useRef(null);
+
+  useEffect(() => {
+    if (isFullscreen) {
+      prevViewRef.current = { center: map.getCenter(), zoom: map.getZoom() };
+      // small delay lets the native fullscreen transition/resize settle
+      // before we measure the container and compute new bounds
+      const t = setTimeout(() => {
+        map.invalidateSize();
+        try {
+          const bounds = getGeoJsonBounds(geojson);
+          if (bounds) {
+            map.fitBounds(bounds, { padding: [60, 60] });
+          }
+        } catch (e) {
+          console.warn('Error fitting bounds on fullscreen:', e);
+        }
+      }, 150);
+      return () => clearTimeout(t);
+    } else if (prevViewRef.current) {
+      const { center, zoom } = prevViewRef.current;
+      const t = setTimeout(() => {
+        map.invalidateSize();
+        map.setView(center, zoom);
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [isFullscreen, map, geojson]);
+
+  return null;
+}
+
 function FitBounds({ geojson }) {
   const map = useMap();
+  const hasFitRef = useRef(false);
+  // Stable content-based key instead of the raw geojson reference — if the
+  // parent re-renders and passes a new object/array reference for the same
+  // data (which happens on state changes elsewhere, e.g. toggling
+  // fullscreen), this won't re-trigger a refit and change the zoom level.
+  const contentKey = geojson?.features
+    ? JSON.stringify(geojson.features.map((f) => f.properties?.OBJECTID))
+    : null;
+
   useEffect(() => {
+    if (hasFitRef.current) return;
     try {
       const bounds = getGeoJsonBounds(geojson);
       if (bounds) {
         map.fitBounds(bounds, { padding: [30, 30] });
+        hasFitRef.current = true;
       }
     } catch (e) {
       console.warn('Error fitting bounds:', e);
     }
-  }, [map, geojson]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, contentKey]);
   return null;
 }
 
@@ -161,7 +211,7 @@ const conditionIconFor = (code) => {
 function WeatherPopupCard({ weather, loading }) {
   if (loading || !weather) {
     return (
-      <div className="w-[190px] bg-gradient-to-br from-primary to-secondary p-3 flex items-center justify-center gap-2 text-white text-xs font-medium">
+      <div className="w-[210px] bg-white p-3.5 flex items-center justify-center gap-2 text-gray-500 text-xs font-medium">
         <Loader2 size={14} className="animate-spin" />
         Fetching weather…
       </div>
@@ -170,27 +220,39 @@ function WeatherPopupCard({ weather, loading }) {
 
   const Icon = conditionIconFor(weather.conditionCode);
 
-  return (
-    <div className="w-[190px] bg-gradient-to-br from-primary to-secondary p-3">
-      <p className="text-[10px] text-white/70 mb-1 truncate">{weather.location}</p>
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold text-white leading-none">{weather.temp}°</span>
-          <span className="text-xs text-white/70">C</span>
-        </div>
-        <Icon size={22} className="text-white" />
-      </div>
-      <p className="text-[11px] text-white/90 font-medium mt-0.5 truncate">{weather.condition}</p>
+  const stats = [
+    { icon: Wind, value: `${weather.wind} km/h`, label: "Wind" },
+    { icon: Droplets, value: `${weather.humidity}%`, label: "Humidity" },
+    { icon: CloudRain, value: `${weather.rainfall} mm`, label: "Rainfall" },
+    { icon: Eye, value: `${weather.visibility} km`, label: "Visibility" },
+  ];
 
-      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/20">
-        <div className="flex items-center gap-1">
-          <Wind size={11} className="text-white/80" />
-          <span className="text-[10px] text-white font-semibold">{weather.wind} km/h</span>
+  return (
+    <div className="w-[210px] bg-white p-3.5">
+      <p className="text-sm font-bold text-gray-800 truncate mb-2">{weather.location}</p>
+
+      <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+        <div className="bg-blue-50 rounded-full p-2 shrink-0">
+          <Icon size={22} className="text-blue-500" />
         </div>
-        <div className="flex items-center gap-1">
-          <Droplets size={11} className="text-white/80" />
-          <span className="text-[10px] text-white font-semibold">{weather.humidity}%</span>
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-bold text-gray-800 leading-none">{weather.temp}°</span>
+            <span className="text-xs text-gray-400 font-medium">C</span>
+          </div>
+          <p className="text-xs text-gray-500 truncate mt-0.5">{weather.condition}</p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-3">
+        {stats.map(({ icon: StatIcon, value, label }) => (
+          <div key={label} className="flex items-center gap-1.5 min-w-0">
+            <StatIcon size={14} className="text-slate-400 shrink-0" />
+            <div className="min-w-0 leading-tight">
+              <p className="text-[13px] font-semibold text-gray-700 truncate">{value}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -339,14 +401,13 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
           z-index: 1200;
         }
         .weather-popup .leaflet-popup-tip {
-          background: #2563EB;
+          background: #ffffff;
         }
         .weather-popup .leaflet-popup-close-button {
-          color: rgba(255,255,255,0.85) !important;
-          z-index: 10;
+          color: #9ca3af !important;
         }
         .weather-popup .leaflet-popup-close-button:hover {
-          color: #ffffff !important;
+          color: #374151 !important;
         }
       `}</style>
 
@@ -364,6 +425,7 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
       >
         <ResizeHandler />
         <FitBounds geojson={geojson} />
+        <FullscreenFit geojson={geojson} isFullscreen={isFullscreen} />
         <MapClickHandler onMapClick={handleClick} />
         <FullscreenControl containerRef={containerRef} />
         <PopupOpener markerRef={markerRef} markerPosition={markerPosition} isFullscreen={isFullscreen} />
