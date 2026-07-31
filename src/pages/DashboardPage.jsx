@@ -160,7 +160,7 @@ return (
           {/* Flyover Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:flex-1 lg:min-h-0">
             {flyovers.map((f) => (
-              <div key={f.id} className="h-80 sm:h-96 md:h-[26rem] lg:h-full">
+              <div key={f.id} className="h-80 sm:h-96 md:h-104 lg:h-full">
                 <FlyoverCard
                   {...f}
                   isActive={activeId === f.id}
@@ -176,8 +176,8 @@ return (
             ))}
           </div>
  
-          <div className="flex items-center justify-center gap-2 bg-white border border-gray-100 rounded-xl2 shadow-card px-4 py-2.5 mt-1 flex-shrink-0">
-            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-warning/10 flex-shrink-0">
+          <div className="flex items-center justify-center gap-2 bg-white border border-gray-100 rounded-xl2 shadow-card px-4 py-2.5 mt-1 shrink-0">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-warning/10 shrink-0">
               <span className="text-warning text-[11px]">⚠️</span>
             </span>
             <p className="text-[10px] sm:text-xs text-gray-500 font-medium">
@@ -187,7 +187,7 @@ return (
         </div>
  
         {/* Weather Panel — 30% */}
-        <div className="lg:col-span-2 mt-4 lg:mt-0 h-[620px] lg:h-full">
+        <div className="lg:col-span-2 mt-4 lg:mt-0 h-155 lg:h-full">
           <WeatherPanel weather={weather} loading={weatherLoading} />
         </div>
       </div>
