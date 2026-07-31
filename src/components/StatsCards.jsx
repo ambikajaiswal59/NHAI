@@ -43,7 +43,7 @@ export default function StatsCards({ stats }) {
           key={key}
           className={`relative bg-white border border-gray-100 border-l-4 ${accent} rounded-xl2 p-3 sm:p-4 flex items-center gap-3 shadow-card hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200`}
         >
-          <div className={`${iconBg} p-2 sm:p-2.5 rounded-lg flex-shrink-0`}>
+          <div className={`${iconBg} p-2 sm:p-2.5 rounded-lg shrink-0`}>
             <Icon size={18} className={iconColor} strokeWidth={2.25} />
           </div>
           <div className="flex flex-col min-w-0">
