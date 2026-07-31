@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #2563EB;
-  --color-secondary: #0EA5E9;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-dashboard: #F5F7FB;
-  --color-card: #FFFFFF;
+    --color-primary: #2563EB;
+    --color-secondary: #0EA5E9;
+    --color-success: #10B981;
+    --color-warning: #F59E0B;
+    --color-danger: #EF4444;
+    --color-dashboard: #F5F7FB;
+    --color-card: #FFFFFF;
 
-  --radius-xl2: 20px;
+    --radius-xl2: 20px;
 
-  --shadow-card: 0 10px 25px rgba(0,0,0,0.08);
+    --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 /* Mobile responsive utilities */
@@ -68,8 +68,8 @@
 }
 
 body {
-  font-family: "Inter", sans-serif;
-  background: #f5f7fb;
+    font-family: "Inter", sans-serif;
+    background: #f5f7fb;
 }
 
 .leaflet-popup-content-wrapper {
