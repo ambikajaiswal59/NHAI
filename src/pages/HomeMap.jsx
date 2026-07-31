@@ -82,7 +82,6 @@ function FadeInGeoJSON({ data, style, targetOpacity = 1, targetFillOpacity, ...r
 }
 
 // Weather Parameter Button Component
-// Weather Parameter Button Component - Enhanced Version
 function WeatherButtonFull({ param, isActive, onClick }) {
     const Icon = param.icon;
 
@@ -165,9 +164,12 @@ export default function HomeMap() {
     const [loadingStatus, setLoadingStatus] = useState("Initializing map...");
     const [overlayVisible, setOverlayVisible] = useState(true);
     const [districtBoundaryData, setDistrictBoundaryData] = useState(null);
-
+    const [builtupLayerData, setBuiltupLayerData] = useState(null); // builtup boundary
     // State for weather parameter selection
     const [activeWeatherParam, setActiveWeatherParam] = useState(null);
+
+    //build up layer
+    const builtupUrl = '/data/Haryana_builtup.geojson';
 
     const stateBoundaryUrl =
         "https://mlinfomap.biz/geoserver/Aaj_Ka_Bharat_CONCOR/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=Aaj_Ka_Bharat_CONCOR%3AState%20Boundary&outputFormat=application/json&featureID=State%20Boundary.11";
@@ -193,6 +195,12 @@ export default function HomeMap() {
 
                 const districtBoundary = await fetchLayer(districtBoundaryUrl);
                 setDistrictBoundaryData(districtBoundary);
+
+                //Builtup layer
+                const builtupBoundary = await fetchLayer(builtupUrl);
+                setBuiltupLayerData(builtupBoundary);
+
+
             } catch (err) {
                 console.error(err);
                 setLoadingStatus("Failed to load map data");
@@ -322,17 +330,18 @@ export default function HomeMap() {
                 >
                     <div className="compact-layer-control">
                         <LayersControl position="topleft">
-                            <LayersControl.BaseLayer checked name="Satellite">
-                                <TileLayer
-                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                    attribution="&copy; Esri"
-                                />
-                            </LayersControl.BaseLayer>
 
-                            <LayersControl.BaseLayer name="Streets">
+                            <LayersControl.BaseLayer checked name="Streets">
                                 <TileLayer
                                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                />
+                            </LayersControl.BaseLayer>
+
+                            <LayersControl.BaseLayer name="Satellite">
+                                <TileLayer
+                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                    attribution="&copy; Esri"
                                 />
                             </LayersControl.BaseLayer>
 
@@ -378,6 +387,21 @@ export default function HomeMap() {
                                             weight: 2,
                                             opacity: 0.8,
                                             fillOpacity: 0.1,
+                                        }}
+                                    />
+                                )}
+                            </LayersControl.Overlay>
+
+                            //builtup layer
+                            <LayersControl.Overlay checked name="Builtup Boundary">
+                                {builtupLayerData && (
+                                    <FadeInGeoJSON
+                                        data={builtupLayerData}
+                                        style={{
+                                            color: "#10786d",
+                                            weight: 2,
+                                            opacity: 0.9,
+                                            fillOpacity: 0.2,
                                         }}
                                     />
                                 )}
