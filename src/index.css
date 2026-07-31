@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #2563EB;
-  --color-secondary: #0EA5E9;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-dashboard: #F5F7FB;
-  --color-card: #FFFFFF;
+    --color-primary: #2563EB;
+    --color-secondary: #0EA5E9;
+    --color-success: #10B981;
+    --color-warning: #F59E0B;
+    --color-danger: #EF4444;
+    --color-dashboard: #F5F7FB;
+    --color-card: #FFFFFF;
 
-  --radius-xl2: 20px;
+    --radius-xl2: 20px;
 
-  --shadow-card: 0 10px 25px rgba(0,0,0,0.08);
+    --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 /* Mobile responsive utilities */
@@ -68,6 +68,29 @@
 }
 
 body {
-  font-family: "Inter", sans-serif;
-  background: #f5f7fb;
+    font-family: "Inter", sans-serif;
+    background: #f5f7fb;
+}
+
+
+
+/* Override Leaflet's default touch styles */
+.leaflet-touch .leaflet-control-layers-toggle {
+    width: 30px !important;
+    height: 30px !important;
+    background-size: 22px 22px !important;
+}
+
+/* Also override non-touch version */
+.leaflet-control-layers-toggle {
+    width: 28px !important;
+    height: 28px !important;
+    background-size: 18px 18px !important;
+}
+
+/* If you want to override zoom controls too */
+.leaflet-touch .leaflet-control-zoom a {
+    width: 30px !important;
+    height: 30px !important;
+    line-height: 30px !important;
 }

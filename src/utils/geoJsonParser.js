@@ -44,22 +44,6 @@ const convertFeature = (feature) => ({
     },
 });
 
-/**
- * Generates alternating statuses along a simplified path (placeholder —
- * swap for real sensor/risk data later)
- */
-const generatePointsAlongPath = (path) => {
-    const statuses = ['normal', 'normal', 'alert', 'normal', 'critical', 'normal', 'alert', 'normal'];
-    return path.map(([lat, lng], index) => ({
-        lat,
-        lng,
-        status: statuses[index % statuses.length]
-    }));
-};
-
-/**
- * Main function to load and parse GeoJSON
- */
 export const loadFlyoverData = async () => {
     try {
         const response = await fetch(GEOJSON_PATH);
@@ -122,7 +106,7 @@ export const loadFlyoverData = async () => {
                 .filter((_, i) => i % step === 0)
                 .map(([lng, lat]) => [lat, lng]);
 
-            const points = generatePointsAlongPath(path);
+
 
             return {
                 id: index + 1,
@@ -130,7 +114,6 @@ export const loadFlyoverData = async () => {
                 riskStatus: riskStatusMap[type] || 'low',
                 center,
                 path,
-                points,
                 geojson: featureCollection, // NEW: actual polygon layer, in WGS84
                 type
             };
