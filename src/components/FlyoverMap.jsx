@@ -1,9 +1,32 @@
 // components/FlyoverMap.jsx
 import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  GeoJSON,
+  Marker,
+  Popup,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Maximize2, Minimize2, CloudRain, Cloud, Sun, Wind, Droplets, Eye, Loader2 } from "lucide-react";
+import {
+  Maximize2,
+  Minimize2,
+  CloudRain,
+  Cloud,
+  Sun,
+  CloudSun,
+  CloudDrizzle,
+  CloudLightning,
+  CloudSnow,
+  Wind,
+  Droplets,
+  Eye,
+  Loader2,
+  MapPin,
+} from "lucide-react";
 import { createRoot } from "react-dom/client";
 
 function ResizeHandler() {
@@ -37,7 +60,7 @@ function FullscreenFit({ geojson, isFullscreen }) {
             map.fitBounds(bounds, { padding: [60, 60] });
           }
         } catch (e) {
-          console.warn('Error fitting bounds on fullscreen:', e);
+          console.warn("Error fitting bounds on fullscreen:", e);
         }
       }, 150);
       return () => clearTimeout(t);
@@ -74,7 +97,7 @@ function FitBounds({ geojson }) {
         hasFitRef.current = true;
       }
     } catch (e) {
-      console.warn('Error fitting bounds:', e);
+      console.warn("Error fitting bounds:", e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, contentKey]);
@@ -82,11 +105,12 @@ function FitBounds({ geojson }) {
 }
 
 function getGeoJsonBounds(geojson) {
-  if (!geojson || !geojson.features || geojson.features.length === 0) return null;
+  if (!geojson || !geojson.features || geojson.features.length === 0)
+    return null;
   const lats = [];
   const lngs = [];
   const walk = (coords) => {
-    if (typeof coords[0] === 'number') {
+    if (typeof coords[0] === "number") {
       const [lng, lat] = coords;
       lats.push(lat);
       lngs.push(lng);
@@ -94,7 +118,7 @@ function getGeoJsonBounds(geojson) {
     }
     coords.forEach(walk);
   };
-  geojson.features.forEach(f => walk(f.geometry.coordinates));
+  geojson.features.forEach((f) => walk(f.geometry.coordinates));
   if (lats.length === 0) return null;
   return [
     [Math.min(...lats), Math.min(...lngs)],
@@ -125,9 +149,11 @@ function FullscreenControl({ containerRef }) {
     const renderIcon = (fullscreen) => {
       if (!root) return;
       root.render(
-        fullscreen
-          ? <Minimize2 size={15} className="text-gray-700" />
-          : <Maximize2 size={15} className="text-gray-700" />
+        fullscreen ? (
+          <Minimize2 size={15} className="text-gray-700" />
+        ) : (
+          <Maximize2 size={15} className="text-gray-700" />
+        ),
       );
     };
 
@@ -199,58 +225,135 @@ const locationIcon = L.divIcon({
   popupAnchor: [0, -30],
 });
 
-const conditionIconFor = (code) => {
-  if (code === "rain" || code === "storm") return CloudRain;
-  if (code === "cloudy" || code === "clouds") return Cloud;
-  return Sun;
+// ---- condition -> visual language -----------------------------------
+// The card itself is a single neutral dark-glass surface (see
+// CARD_BACKGROUND below) so it holds up against any map terrain —
+// green farmland, gray city blocks, blue coastline, dark satellite.
+// Only the icon badge and its glow carry the condition's color, so the
+// weather is still legible at a glance without recoloring the whole card.
+const CONDITIONS = {
+  clear: { icon: Sun, accent: "#fdba55", glow: "rgba(253,186,85,0.35)" },
+  "partly cloudy": { icon: CloudSun, accent: "#63b3ed", glow: "rgba(99,179,237,0.3)" },
+  cloudy: { icon: Cloud, accent: "#9aa5b1", glow: "rgba(154,165,177,0.25)" },
+  rain: { icon: CloudRain, accent: "#4fa3d1", glow: "rgba(79,163,209,0.3)" },
+  drizzle: { icon: CloudDrizzle, accent: "#7ec8e3", glow: "rgba(126,200,227,0.28)" },
+  storm: { icon: CloudLightning, accent: "#b39ddb", glow: "rgba(179,157,219,0.35)" },
+  snow: { icon: CloudSnow, accent: "#d9ecfb", glow: "rgba(217,236,251,0.35)" },
 };
+
+// One dark glass surface, used for every condition, so the card always
+// reads as a distinct floating panel no matter what's underneath it.
+const CARD_BACKGROUND =
+  "linear-gradient(165deg, rgba(30,35,46,0.94) 0%, rgba(14,17,23,0.96) 100%)";
+
+function resolveCondition(conditionCode) {
+  const key = (conditionCode || "").toLowerCase();
+  if (key.includes("clear") || key.includes("sun")) return CONDITIONS.clear;
+  if (key.includes("partly")) return CONDITIONS["partly cloudy"];
+  if (key.includes("storm") || key.includes("thunder")) return CONDITIONS.storm;
+  if (key.includes("drizzle")) return CONDITIONS.drizzle;
+  if (key.includes("rain")) return CONDITIONS.rain;
+  if (key.includes("snow")) return CONDITIONS.snow;
+  if (key.includes("cloud")) return CONDITIONS.cloudy;
+  return CONDITIONS["partly cloudy"];
+}
 
 // Compact weather card rendered inside the Leaflet popup. Handles its own
 // loading state so the popup can open the instant the marker is placed,
-// before the weather API response has come back.
+// before the weather API response has come back. Same name/props as
+// before (`weather`, `loading`) so nothing else in this file needs to
+// change — only the internals are redesigned.
 function WeatherPopupCard({ weather, loading }) {
   if (loading || !weather) {
     return (
-      <div className="w-[210px] bg-white p-3.5 flex items-center justify-center gap-2 text-gray-500 text-xs font-medium">
-        <Loader2 size={14} className="animate-spin" />
-        Fetching weather…
+      <div className="w-72 rounded-[28px] bg-white/90 backdrop-blur-xl p-6 shadow-2xl ring-1 ring-black/5">
+        <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-500">
+          <Loader2 size={16} className="animate-spin" />
+          Fetching weather…
+        </div>
       </div>
     );
   }
 
-  const Icon = conditionIconFor(weather.conditionCode);
+  const theme = resolveCondition(weather.conditionCode || weather.condition);
+  const Icon = theme.icon;
 
   const stats = [
-    { icon: Wind, value: `${weather.wind} km/h`, label: "Wind" },
-    { icon: Droplets, value: `${weather.humidity}%`, label: "Humidity" },
-    { icon: CloudRain, value: `${weather.rainfall} mm`, label: "Rainfall" },
-    { icon: Eye, value: `${weather.visibility} km`, label: "Visibility" },
+    { icon: Wind, value: weather.wind, unit: "km/h", label: "Wind" },
+    { icon: Droplets, value: weather.humidity, unit: "%", label: "Humidity" },
+    { icon: CloudRain, value: weather.rainfall, unit: "mm", label: "Rainfall" },
+    { icon: Eye, value: weather.visibility, unit: "km", label: "Visibility" },
   ];
 
   return (
-    <div className="w-[210px] bg-white p-3.5">
-      <p className="text-sm font-bold text-gray-800 truncate mb-2">{weather.location}</p>
+    <div
+      className="relative w-72 overflow-hidden rounded-[28px] p-5 text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)] ring-2 ring-white/15 backdrop-blur-xl"
+      style={{ background: CARD_BACKGROUND }}
+    >
+      {/* faint top sheen so the glass panel reads as a lit surface, not a flat fill */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
 
-      <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-        <div className="bg-blue-50 rounded-full p-2 shrink-0">
-          <Icon size={22} className="text-blue-500" />
+      {/* header */}
+      <div className="relative flex items-start justify-between">
+        <div className="flex items-center gap-1.5">
+          <MapPin size={13} className="text-white/60" strokeWidth={2.5} />
+          <p className="text-[14px] font-semibold tracking-wide text-white/90">
+            {weather.location}
+          </p>
         </div>
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-2xl font-bold text-gray-800 leading-none">{weather.temp}°</span>
-            <span className="text-xs text-gray-400 font-medium">C</span>
+        <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/70 ring-1 ring-white/10">
+          Live
+        </span>
+      </div>
+
+      {/* hero temperature */}
+      <div className="relative mt-4 flex items-center justify-between">
+        <div>
+          <div className="flex items-start leading-none">
+            <span className="text-[56px] font-bold tracking-tight">
+              {weather.temp}
+            </span>
+            <span className="mt-1.5 text-2xl font-semibold text-white/50">°</span>
           </div>
-          <p className="text-xs text-gray-500 truncate mt-0.5">{weather.condition}</p>
+          <p className="mt-1 text-sm font-medium text-white/70">
+            {weather.condition}
+          </p>
+        </div>
+
+        {/* the only place condition color shows up: icon + its glow */}
+        <div className="relative flex h-16 w-16 items-center justify-center">
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl blur-xl"
+            style={{ background: theme.glow }}
+          />
+          <div
+            className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10"
+          >
+            <Icon size={32} strokeWidth={1.8} style={{ color: theme.accent }} />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-3">
-        {stats.map(({ icon: StatIcon, value, label }) => (
-          <div key={label} className="flex items-center gap-1.5 min-w-0">
-            <StatIcon size={14} className="text-slate-400 shrink-0" />
-            <div className="min-w-0 leading-tight">
-              <p className="text-[13px] font-semibold text-gray-700 truncate">{value}</p>
-            </div>
+      {/* divider */}
+      <div className="relative mt-5 h-px w-full bg-white/10" />
+
+      {/* stats row — compact glass pills instead of four heavy tiles */}
+      <div className="relative mt-4 grid grid-cols-4 gap-2">
+        {stats.map(({ icon: StatIcon, value, unit, label }) => (
+          <div
+            key={label}
+            className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.06] py-3 ring-1 ring-white/10"
+          >
+            <StatIcon size={15} className="text-white/70" strokeWidth={2} />
+            <p className="text-[13px] font-bold leading-none text-white">
+              {value}
+              <span className="ml-0.5 text-[9px] font-medium text-white/50">
+                {unit}
+              </span>
+            </p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-white/45">
+              {label}
+            </p>
           </div>
         ))}
       </div>
@@ -287,7 +390,7 @@ function FlyoverGeoJsonLayer({ data, color, isActive, onFeatureClick }) {
 
   return (
     <GeoJSON
-      key={JSON.stringify(data.features.map(f => f.properties?.OBJECTID))}
+      key={JSON.stringify(data.features.map((f) => f.properties?.OBJECTID))}
       data={data}
       style={style}
       onEachFeature={onEachFeature}
@@ -326,39 +429,40 @@ export default function FlyoverMap({
   const getOverallRiskColor = () => {
     if (riskStatus && riskColorMap[riskStatus]) return riskColorMap[riskStatus];
     if (!points || points.length === 0) return "#facc15";
-    const hasCritical = points.some(p => p.status === "critical");
-    const hasAlert = points.some(p => p.status === "alert");
+    const hasCritical = points.some((p) => p.status === "critical");
+    const hasAlert = points.some((p) => p.status === "alert");
     if (hasCritical) return "#ef4444";
     if (hasAlert) return "#f97316";
     return "#22c55e";
   };
 
   const pathColor = getOverallRiskColor();
-  const validCenter = center && center.length === 2 ? center : [28.6139, 77.2290];
+  const validCenter =
+    center && center.length === 2 ? center : [28.6139, 77.229];
 
   const handleClick = (lat, lng) => {
     if (onMapClick) onMapClick(lat, lng);
   };
 
-// Must live *inside* MapContainer to use useMap(). Invalidates the map's
-// cached size before opening the popup — right after a fullscreen
-// transition Leaflet's internal size can be stale, which throws off the
-// popup's pixel position and makes it render off-screen (looks like no
-// popup shows up at all). Only opens the popup when this card is the one
-// currently in fullscreen — in the normal grid view, a click should just
-// update the side WeatherPanel, not pop anything up on the map.
-function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
-  const map = useMap();
-  useEffect(() => {
-    if (markerPosition && markerRef.current && isFullscreen) {
-      map.invalidateSize();
-      requestAnimationFrame(() => {
-        markerRef.current?.openPopup();
-      });
-    }
-  }, [markerPosition, map, markerRef, isFullscreen]);
-  return null;
-}
+  // Must live *inside* MapContainer to use useMap(). Invalidates the map's
+  // cached size before opening the popup — right after a fullscreen
+  // transition Leaflet's internal size can be stale, which throws off the
+  // popup's pixel position and makes it render off-screen (looks like no
+  // popup shows up at all). Only opens the popup when this card is the one
+  // currently in fullscreen — in the normal grid view, a click should just
+  // update the side WeatherPanel, not pop anything up on the map.
+  function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
+    const map = useMap();
+    useEffect(() => {
+      if (markerPosition && markerRef.current && isFullscreen) {
+        map.invalidateSize();
+        requestAnimationFrame(() => {
+          markerRef.current?.openPopup();
+        });
+      }
+    }, [markerPosition, map, markerRef, isFullscreen]);
+    return null;
+  }
 
   return (
     <div ref={containerRef} className="w-full h-full bg-black">
@@ -388,11 +492,18 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
         }
         :fullscreen .leaflet-container { border-radius: 0 !important; }
 
+        /* Popup chrome now defers almost entirely to the card itself —
+           the card carries its own rounded corners, gradient and shadow,
+           so the wrapper just needs to get out of the way. The default
+           white triangle tip is dropped since it no longer matches a
+           colored, condition-driven card; the marker below is anchor
+           enough to read where the popup belongs. */
         .weather-popup .leaflet-popup-content-wrapper {
           padding: 0;
-          border-radius: 12px;
+          border-radius: 28px;
           overflow: hidden;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+          background: transparent;
+          box-shadow: none;
         }
         .weather-popup .leaflet-popup-content {
           margin: 0;
@@ -400,14 +511,16 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
         .leaflet-popup-pane {
           z-index: 1200;
         }
-        .weather-popup .leaflet-popup-tip {
-          background: #ffffff;
+        .weather-popup .leaflet-popup-tip-container {
+          display: none;
         }
         .weather-popup .leaflet-popup-close-button {
-          color: #9ca3af !important;
+          color: rgba(255,255,255,0.55) !important;
+          top: 10px !important;
+          right: 10px !important;
         }
         .weather-popup .leaflet-popup-close-button:hover {
-          color: #374151 !important;
+          color: #ffffff !important;
         }
       `}</style>
 
@@ -420,7 +533,12 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
         zoomControl={true}
         touchZoom={true}
         attributionControl={false}
-        style={{ height: "100%", width: "100%", minHeight: "200px", cursor: 'pointer' }}
+        style={{
+          height: "100%",
+          width: "100%",
+          minHeight: "200px",
+          cursor: "pointer",
+        }}
         className="rounded-lg"
       >
         <ResizeHandler />
@@ -428,7 +546,11 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
         <FullscreenFit geojson={geojson} isFullscreen={isFullscreen} />
         <MapClickHandler onMapClick={handleClick} />
         <FullscreenControl containerRef={containerRef} />
-        <PopupOpener markerRef={markerRef} markerPosition={markerPosition} isFullscreen={isFullscreen} />
+        <PopupOpener
+          markerRef={markerRef}
+          markerPosition={markerPosition}
+          isFullscreen={isFullscreen}
+        />
 
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -450,7 +572,12 @@ function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
             ref={markerRef}
           >
             {isFullscreen && (
-              <Popup className="weather-popup" closeButton={true} autoPan={true} offset={[0, -6]}>
+              <Popup
+                className="weather-popup"
+                closeButton={true}
+                autoPan={true}
+                offset={[0, -6]}
+              >
                 <WeatherPopupCard weather={weather} loading={weatherLoading} />
               </Popup>
             )}
