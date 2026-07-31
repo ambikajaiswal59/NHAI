@@ -114,13 +114,13 @@ export default function WeatherPanel({ weather: weatherProp, loading, hourStep =
             )}
           </div>
         </div>
-        <span className="flex items-center gap-1 shrink-0 bg-emerald-50 border border-emerald-200 text-emerald-600 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full">
+        {/* <span className="flex items-center gap-1 shrink-0 bg-emerald-50 border border-emerald-200 text-emerald-600 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping" />
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
           </span>
           Live
-        </span>
+        </span> */}
       </div>
 
       {/* Hero — current conditions */}
