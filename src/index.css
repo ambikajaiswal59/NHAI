@@ -71,26 +71,3 @@ body {
     font-family: "Inter", sans-serif;
     background: #f5f7fb;
 }
-
-
-
-/* Override Leaflet's default touch styles */
-.leaflet-touch .leaflet-control-layers-toggle {
-    width: 30px !important;
-    height: 30px !important;
-    background-size: 22px 22px !important;
-}
-
-/* Also override non-touch version */
-.leaflet-control-layers-toggle {
-    width: 28px !important;
-    height: 28px !important;
-    background-size: 18px 18px !important;
-}
-
-/* If you want to override zoom controls too */
-.leaflet-touch .leaflet-control-zoom a {
-    width: 30px !important;
-    height: 30px !important;
-    line-height: 30px !important;
-}

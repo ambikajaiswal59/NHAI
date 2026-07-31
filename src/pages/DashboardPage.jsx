@@ -6,12 +6,32 @@ import { sendLocationToAPI } from "../services/api";
 import StatsCards from "../components/StatsCards";
 import FlyoverCard from "../components/FlyoverCards";
 import WeatherPanel from "../components/WeatherPanel";
+import AlertMarquee from "../components/AlertMarquess";
 
 export default function DashboardPage() {
   // Load real flyover data from GeoJSON — this page is the only one that
   // needs it, so it's fetched here instead of in App.jsx.
   const { flyovers, loading, error } = useFlyoverData();
-
+  const alerts = [
+    {
+      id: 1,
+      severity: "critical",
+      message: "High risk detected on Sector 4 flyover",
+      meta: "2 min ago",
+    },
+    {
+      id: 2,
+      severity: "warning",
+      message: "Visibility dropping below 5km near Ambala",
+      meta: "12 min ago",
+    },
+    {
+      id: 3,
+      severity: "info",
+      message: "Satellite pass completed for all active flyovers",
+      meta: "34 min ago",
+    },
+  ];
   // Calculate stats from loaded data
   const stats =
     flyovers.length > 0
@@ -53,8 +73,6 @@ export default function DashboardPage() {
           lng: activeFlyover.center[1],
         });
 
-        console.log("Initial Weather:", response);
-
         setWeather(response);
         setHasInitialWeatherFetch(true);
       } catch (error) {
@@ -86,8 +104,6 @@ export default function DashboardPage() {
         lat,
         lng,
       });
-
-      console.log(response);
 
       setWeather(response);
     } catch (err) {
@@ -131,44 +147,49 @@ export default function DashboardPage() {
     );
   }
 
-  return (
-    <div className="flex flex-col lg:grid lg:grid-cols-10 gap-4 lg:gap-5 h-full">
-      {/* Left section — Maps (70%) */}
-      <div className="lg:col-span-8 flex flex-col gap-4">
-        <StatsCards stats={stats} />
-
-        {/* Flyover Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:flex-1 lg:min-h-0">
-          {flyovers.map((f) => (
-            <div key={f.id} className="h-80 sm:h-96 md:h-[26rem] lg:h-full">
-              <FlyoverCard
-                {...f}
-                isActive={activeId === f.id}
-                onActivate={() => setActiveId(f.id)}
-                onMapClick={handleMapClick}
-                markerPosition={
-                  clickedLocation?.id === f.id ? clickedLocation : null
-                }
-                weather={weather}
-                weatherLoading={weatherLoading}
-              />
-            </div>
-          ))}
+return (
+    <div className="flex flex-col gap-4 h-full">
+      {/* Marquee sits above everything, full dashboard width */}
+      <AlertMarquee alerts={alerts} />
+ 
+      <div className="flex flex-col lg:grid lg:grid-cols-10 gap-4 lg:gap-5 flex-1 min-h-0">
+        {/* Left section — Maps (70%) */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <StatsCards stats={stats} />
+ 
+          {/* Flyover Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:flex-1 lg:min-h-0">
+            {flyovers.map((f) => (
+              <div key={f.id} className="h-80 sm:h-96 md:h-[26rem] lg:h-full">
+                <FlyoverCard
+                  {...f}
+                  isActive={activeId === f.id}
+                  onActivate={() => setActiveId(f.id)}
+                  onMapClick={handleMapClick}
+                  markerPosition={
+                    clickedLocation?.id === f.id ? clickedLocation : null
+                  }
+                  weather={weather}
+                  weatherLoading={weatherLoading}
+                />
+              </div>
+            ))}
+          </div>
+ 
+          <div className="flex items-center justify-center gap-2 bg-white border border-gray-100 rounded-xl2 shadow-card px-4 py-2.5 mt-1 flex-shrink-0">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-warning/10 flex-shrink-0">
+              <span className="text-warning text-[11px]">⚠️</span>
+            </span>
+            <p className="text-[10px] sm:text-xs text-gray-500 font-medium">
+              Risk status is based on latest satellite analysis and AI assessment
+            </p>
+          </div>
         </div>
-
-        <div className="flex items-center justify-center gap-2 bg-white border border-gray-100 rounded-xl2 shadow-card px-4 py-2.5 mt-1 flex-shrink-0">
-          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-warning/10 flex-shrink-0">
-            <span className="text-warning text-[11px]">⚠️</span>
-          </span>
-          <p className="text-[10px] sm:text-xs text-gray-500 font-medium">
-            Risk status is based on latest satellite analysis and AI assessment
-          </p>
+ 
+        {/* Weather Panel — 30% */}
+        <div className="lg:col-span-2 mt-4 lg:mt-0 h-[620px] lg:h-full">
+          <WeatherPanel weather={weather} loading={weatherLoading} />
         </div>
-      </div>
-
-      {/* Weather Panel — 30% */}
-      <div className="lg:col-span-2 mt-4 lg:mt-0 h-[620px] lg:h-full">
-        <WeatherPanel weather={weather} loading={weatherLoading} />
       </div>
     </div>
   );
