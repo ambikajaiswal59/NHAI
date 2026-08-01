@@ -1,5 +1,5 @@
 // src/router/routes.jsx
-import HomeMap from "../pages/HomeMap";
+import HomeMap from "../pages/Home";
 import DashboardPage from "../pages/DashboardPage";
 import WeatherMapPage from "../pages/WeatherMapPage";
 import ReportsPage from "../pages/ReportsPage";

@@ -1,12 +1,32 @@
 // src/components/Sidebar.jsx
-import { Home, LayoutDashboard, CloudSun, FileText, Settings, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  Waypoints,
+  Radar,
+  Bell,
+  BarChart3,
+  ClipboardCheck,
+  FileText,
+  CloudSun,
+  Puzzle,
+  Settings,
+  HelpCircle,
+} from "lucide-react";
 import { ROUTES } from "../router/routes";
 
+// NOTE: make sure these keys exist in ../router/routes.js
+// (FLYOVERS, MONITORING, ALERTS, ANALYTICS, INSPECTIONS, REPORTS, WEATHER, INTEGRATIONS, SETTINGS)
 const navItems = [
-  { label: "Home", icon: Home, id: ROUTES.HOME },
-  { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.DASHBOARD },
-  { label: "Weather Map", icon: CloudSun, id: ROUTES.WEATHER },
+  { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.HOME },
+  { label: "Flyovers", icon: Waypoints, id: ROUTES.DASHBOARD },
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
+  { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
+  //{ label: "Monitoring", icon: Radar, id: ROUTES.MONITORING },
+  { label: "Alerts", icon: Bell, badge: 3 },
+  { label: "Analytics", icon: BarChart3, id: ROUTES.ANALYTICS },
+  { label: "Inspections", icon: ClipboardCheck, id: ROUTES.INSPECTIONS },
+
+  // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
 ];
 
 export default function Sidebar({ activeItem, onNavClick, onClose }) {
@@ -18,71 +38,61 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
   };
 
   return (
-    <aside className="w-56 h-screen bg-white border-r border-gray-100 flex flex-col justify-between">
+    <aside className="w-25 h-screen bg-[#0a1130] flex flex-col justify-between">
       <div>
-        {/* Logo */}
-        <div className="relative flex items-center gap-2.5 h-[72px] px-4 border-b border-gray-100">
-          <button
-            onClick={onClose}
-            className="lg:hidden absolute top-2 right-2 p-1 hover:bg-gray-100 rounded"
-          >
-            <X size={16} className="text-gray-400" />
-          </button>
-
-          <div className="w-10 h-10 rounded-xl2 overflow-hidden shadow-card ring-2 ring-white flex-shrink-0 bg-gradient-to-br from-primary to-secondary p-[2px]">
-            <img
-              src="/images/NHAI-logo.png"
-              alt="NHAI Logo"
-              className="w-full h-full object-cover rounded-[13px] bg-white"
-            />
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 leading-tight truncate">NHAI</p>
-            <p className="text-[9px] font-medium text-gray-400 leading-tight tracking-wide uppercase">
-              Infrastructure Monitoring
-            </p>
-          </div>
-        </div>
-
         {/* Navigation */}
-        <nav className="mt-4 px-3 space-y-1">
-          {navItems.map(({ label, icon: Icon, id }) => {
+        <nav className="mt-4 px-2 space-y-1">
+          {navItems.map(({ label, icon: Icon, id, badge }) => {
             const isActive = activeItem === id;
             return (
               <button
-                key={id}
-                onClick={() => handleNavClick(id)}
-                className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${isActive
-                  ? "bg-gradient-to-r from-primary to-secondary text-white shadow-card"
-                  : "text-gray-500 hover:bg-dashboard hover:text-gray-700"
-                  }`}
+                key={label}
+                disabled={!id}
+                onClick={() => id && handleNavClick(id)}
+                className={`group relative w-full flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium transition-all duration-200 ${
+                  !id
+                    ? "cursor-not-allowed opacity-50"
+                    : isActive
+                      ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-900/40"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                }`}
               >
                 <Icon
-                  size={17}
+                  size={20}
                   strokeWidth={isActive ? 2.25 : 2}
                   className={
                     isActive
                       ? "text-white flex-shrink-0"
-                      : "text-gray-400 group-hover:text-primary flex-shrink-0"
+                      : "text-slate-400 group-hover:text-blue-400 flex-shrink-0"
                   }
                 />
-                <span className="leading-tight">{label}</span>
+                <span className="leading-tight text-center">{label}</span>
+
+                {badge ? (
+                  <span className="absolute top-1.5 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                    {badge}
+                  </span>
+                ) : null}
               </button>
             );
           })}
         </nav>
       </div>
 
-      {/* Settings */}
-      <div className="px-3 pb-4">
-        <div className="h-px bg-gray-100 mb-3" />
+      {/* Settings + Help */}
+      <div className="mt-auto px-2 pb-4">
+        <div className="h-px bg-white/5 mb-3" />
+
         <button
-          onClick={() => console.log("Settings clicked - coming soon")}
-          className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium text-gray-500 hover:bg-dashboard hover:text-gray-700 transition-all duration-200"
+          onClick={() => console.log("Help clicked")}
+          className="group w-full flex flex-col items-center justify-center gap-1 py-2.5 mt-1 rounded-xl text-[10px] font-medium text-slate-400 hover:bg-white/5 hover:text-white transition-all duration-200"
         >
-          <Settings size={17} className="text-gray-400 group-hover:text-primary flex-shrink-0" />
-          Settings
+          <HelpCircle
+            size={18}
+            className="text-slate-400 group-hover:text-blue-400"
+          />
+
+          <span>Help</span>
         </button>
       </div>
     </aside>
