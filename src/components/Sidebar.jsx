@@ -38,10 +38,10 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
   };
 
   return (
-    <aside className="w-25 h-screen bg-[#0a1130] flex flex-col justify-between">
+    <aside className="w-40 h-screen bg-[#0a1130] flex flex-col justify-between">
       <div>
         {/* Navigation */}
-        <nav className="mt-4 px-2 space-y-1">
+        <nav className="mt-4 px-6 space-y-1">
           {navItems.map(({ label, icon: Icon, id, badge }) => {
             const isActive = activeItem === id;
             return (
@@ -49,7 +49,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 key={label}
                 disabled={!id}
                 onClick={() => id && handleNavClick(id)}
-                className={`group relative w-full flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium transition-all duration-200 ${
+                className={`group relative w-full flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 ${
                   !id
                     ? "cursor-not-allowed opacity-50"
                     : isActive

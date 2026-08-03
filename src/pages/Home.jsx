@@ -1,11 +1,4 @@
-// Home.jsx
-// Recreated home page: 3 stacked sections
-//   1. StatsOverview   — top stat-card row (image 1)
-//   2. HomeMap         — map only, no toolbar (image 1)
-//   3. FlyoverHealthOverview — flyover health cards (image 2)
-//import StatsOverview from "../components/Statsoverview";
 import StatsOverview from "../components/StatsOverview";
-// import HomeMap from "../componentsHomemap";
 import HomeMap from "../components/HomeMap";
 import FlyoverHealthOverview from "../components/FlyoverHealthOverview";
 
@@ -15,8 +8,10 @@ export default function Home() {
       {/* Section 1: stat cards */}
       <StatsOverview />
 
-      {/* Section 2: map only */}
-      <div className="w-full h-[480px]">
+      {/* Section 2: map — HomeMap now controls its own height (h-[640px]) internally,
+          so no wrapping div with a conflicting height here. That mismatch was
+          what caused it to overlap Section 3. */}
+      <div className="w-full h-[540px]">
         <HomeMap />
       </div>
 

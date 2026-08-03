@@ -1,5 +1,5 @@
 // Header.jsx
-import { Calendar, ChevronDown, CircleDot } from "lucide-react";
+import { Calendar, ChevronDown } from "lucide-react";
 
 export default function Header({
   systemStatus = "Operational",
@@ -10,90 +10,94 @@ export default function Header({
   userInitials = "AD",
 }) {
   return (
-    <header className="relative w-full h-[92px] bg-white flex items-center justify-between px-6 overflow-hidden">
-      {/* decorative blue swoosh background, right side */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-2/3">
-        <svg
-          viewBox="0 0 900 100"
-          preserveAspectRatio="none"
-          className="w-full h-full"
-        >
-          <path d="M0,100 L120,0 L900,0 L900,100 Z" fill="#EAF2FE" />
-        </svg>
-      </div>
-      {/* right edge accent strip */}
-      <div className="absolute top-0 right-0 h-full w-1.5 bg-blue-600" />
+    <header className="relative w-full h-[113px] bg-white flex items-center overflow-hidden">
+      {/* light-blue curved swoosh behind the right side */}
+      <svg
+        className="pointer-events-none absolute inset-y-0 right-0 w-[66%] h-full"
+        viewBox="0 0 940 113"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M 260 0 C 130 0, 190 113, 60 113 L 940 113 L 940 0 Z"
+          fill="#E8F1FE"
+        />
+      </svg>
 
-      {/* Left: logo + org name */}
-      <div className="relative z-10 flex items-center gap-2.5 flex-shrink-0">
-        <div className="w-10 h-10 rounded-xl2 overflow-hidden shadow-card ring-2 ring-white flex-shrink-0 bg-gradient-to-br from-primary to-secondary p-[2px]">
-          <img
-            src="/images/NHAI-logo.png"
-            alt="NHAI Logo"
-            className="w-full h-full object-cover rounded-[13px] bg-white"
-          />
-        </div>
+      {/* thin blue accent bar, right edge */}
+      <div className="absolute top-[6px] right-0 h-[calc(100%-12px)] w-[7px] bg-blue-800 rounded-l-md" />
 
-        <div className="min-w-0 leading-tight">
-          <p className="text-base font-extrabold text-red-600 leading-none">
-            NHAI
-          </p>
-          <p className="text-[11px] text-gray-500 leading-[1.2] mt-1">
-            National Highways
-            <br />
-            Authority of India
-          </p>
-        </div>
-      </div>
+      {/* content row */}
+      <div className="relative z-10 flex items-center w-full px-[26px]">
+        {/* ---------- Logo + org name ---------- */}
+        <div className="flex items-center flex-shrink-0">
+          <div className="w-[46px] h-[46px] rounded-xl bg-gradient-to-br from-[#0e2a5e] to-[#163d82] shadow-md flex items-center justify-center flex-shrink-0">
+            <svg viewBox="0 0 24 24" className="w-[30px] h-[30px]" fill="none">
+              <path d="M3 16 Q9 6 21 8" stroke="#f2b705" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+              <path d="M3 19 Q9 9 21 11" stroke="#f2b705" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+            </svg>
+          </div>
 
-      {/* Center: title + tagline */}
-      <div className="relative z-10 flex flex-col items-start flex-1 px-8">
-        <h1 className="text-[20px] font-bold text-gray-900 leading-none">
-          AI Risk Intelligence &amp; Remote Monitoring System
-        </h1>
-        <div className="flex items-center gap-1.5 text-[12px] font-semibold mt-2">
-          <span className="text-blue-600">• Smart Monitoring</span>
-          <span className="text-emerald-600 ml-3">• Predictive Insights</span>
-          <span className="text-orange-500 ml-3">• Safer Highways</span>
-        </div>
-      </div>
-
-      {/* Right: status, date, user */}
-      <div className="relative z-10 flex items-center gap-6 flex-shrink-0 pr-4">
-        {/* System status */}
-        <div className="flex items-center gap-2">
-          <CircleDot className="w-3.5 h-3.5 text-emerald-500" strokeWidth={3} />
-          <div className="leading-tight">
-            <p className="text-[11px] text-gray-600">System Status</p>
-            <p className="text-[13px] font-bold text-emerald-600 leading-none mt-1">
-              {systemStatus}
+          <div className="ml-3 leading-tight">
+            <p className="text-[19px] font-extrabold text-red-600 tracking-tight leading-none">
+              NHAI
+            </p>
+            <p className="text-[11px] text-gray-500 leading-[1.3] mt-[3px]">
+              National Highways
+              <br />
+              Authority of India
             </p>
           </div>
         </div>
 
-        {/* Date / time */}
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-700" />
-          <div className="leading-tight">
-            <p className="text-[13px] font-semibold text-gray-800 leading-none">
-              {dateLabel}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">{timeLabel}</p>
+        {/* ---------- Title + tagline ---------- */}
+        <div className="flex-1 min-w-0 ml-[34px]">
+          <h1 className="text-[21px] font-bold text-gray-800 whitespace-nowrap">
+            AI Risk Intelligence &amp; Remote Monitoring System
+          </h1>
+          <div className="mt-[6px] text-[12.5px] font-bold whitespace-nowrap">
+            <span className="text-blue-600 mr-3.5">&bull; Smart Monitoring</span>
+            <span className="text-emerald-600 mr-3.5">&bull; Predictive Insights</span>
+            <span className="text-orange-600">&bull; Safer Highways</span>
           </div>
         </div>
 
-        {/* User */}
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full bg-slate-800 text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0">
-            {userInitials}
+        {/* ---------- Status / Date / User ---------- */}
+        <div className="flex items-center flex-shrink-0 gap-[30px] pr-2">
+          {/* System status */}
+          <div className="flex items-center gap-2">
+            <span className="w-[9px] h-[9px] rounded-full bg-emerald-500 flex-shrink-0" />
+            <div className="leading-tight">
+              <p className="text-[11.5px] text-gray-500">System Status</p>
+              <p className="text-[13.5px] font-bold text-emerald-600 leading-none mt-[3px]">
+                {systemStatus}
+              </p>
+            </div>
           </div>
-          <div className="leading-tight">
-            <p className="text-[13px] font-semibold text-gray-800 leading-none">
-              {userName}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">{userSubtitle}</p>
+
+          {/* Date / time */}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-[18px] h-[18px] text-gray-700 flex-shrink-0" strokeWidth={2} />
+            <div className="leading-tight">
+              <p className="text-[13.5px] font-semibold text-gray-800 leading-none">
+                {dateLabel}
+              </p>
+              <p className="text-[11.5px] text-gray-500 mt-[3px]">{timeLabel}</p>
+            </div>
           </div>
-          <ChevronDown className="w-4 h-4 text-gray-400 ml-1" />
+
+          {/* User */}
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-full bg-slate-800 text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0">
+              {userInitials}
+            </div>
+            <div className="leading-tight">
+              <p className="text-[13.5px] font-semibold text-gray-800 leading-none">
+                {userName}
+              </p>
+              <p className="text-[11.5px] text-gray-500 mt-[3px]">{userSubtitle}</p>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-400 ml-0.5" />
+          </div>
         </div>
       </div>
     </header>

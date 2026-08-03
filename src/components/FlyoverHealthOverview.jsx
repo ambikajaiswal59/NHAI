@@ -1,6 +1,8 @@
 // FlyoverHealthOverview.jsx
 // Section 3 — flyover health card row (matches reference image 2's "Flyover Health Overview")
 import { ChevronRight } from "lucide-react";
+import FlyoverImage1 from "../assets/flyover-bridge-construction.png"
+import FlyoverImage2 from "../assets/FlyoverBridgetwo.jpg"
 
 const STATUS_STYLES = {
   Critical: { badge: "bg-red-600", text: "text-red-600", line: "#DC2626", track: "bg-red-50" },
@@ -17,7 +19,7 @@ const FLYOVERS = [
     status: "Critical",
     movement: "+18.7",
     healthScore: 42,
-    image: "/images/flyovers/flyover-1.jpg",
+    image: FlyoverImage1,
     trend: [4, 8, 6, 12, 10, 16, 13, 18, 15, 20, 17, 19],
   },
   {
@@ -27,7 +29,7 @@ const FLYOVERS = [
     status: "High",
     movement: "+11.3",
     healthScore: 63,
-    image: "/images/flyovers/flyover-2.jpg",
+    image: FlyoverImage2,
     trend: [3, 5, 4, 7, 6, 9, 8, 11, 9, 12, 10, 11],
   },
   {
@@ -37,7 +39,7 @@ const FLYOVERS = [
     status: "Moderate",
     movement: "+4.6",
     healthScore: 76,
-    image: "/images/flyovers/flyover-3.jpg",
+    image: FlyoverImage1,
     trend: [2, 3, 2.5, 4, 3.5, 4.5, 4, 5, 4.2, 4.8, 4.4, 4.6],
   },
   {
@@ -47,7 +49,7 @@ const FLYOVERS = [
     status: "Low",
     movement: "+1.2",
     healthScore: 92,
-    image: "/images/flyovers/flyover-4.jpg",
+    image: FlyoverImage1,
     trend: [0.8, 1, 0.9, 1.3, 1.1, 1.4, 1.0, 1.2, 0.9, 1.3, 1.1, 1.2],
   },
 ];
@@ -80,7 +82,7 @@ function FlyoverCard({ flyover }) {
   return (
     <div className="flex-1 min-w-[220px] bg-white rounded-xl2 shadow-card ring-1 ring-gray-100 overflow-hidden">
       {/* Image + status badge */}
-      <div className="relative h-28 w-full">
+      <div className="relative h-48 w-full">
         <img
           src={flyover.image}
           alt={flyover.name}
@@ -129,9 +131,9 @@ export default function FlyoverHealthOverview() {
     <div className="w-full bg-white rounded-xl2 shadow-card ring-1 ring-gray-100 p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[15px] font-bold text-gray-900">Flyover Health Overview</h2>
-        <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-700">
+        {/* <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-700">
           View All
-        </button>
+        </button> */}
       </div>
       <div className="flex flex-col sm:flex-row gap-3">
         {FLYOVERS.map((flyover) => (

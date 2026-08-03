@@ -61,7 +61,7 @@ export default function MainLayout({ children, activeNav, onNavChange }) {
             h-full lg:h-auto
             transform transition-transform duration-300 ease-in-out
             ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-            w-22 flex-shrink-0
+            w-40 flex-shrink-0
           `}
         >
           <Sidebar
