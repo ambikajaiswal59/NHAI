@@ -12,26 +12,26 @@ export default function DashboardPage() {
   // Load real flyover data from GeoJSON — this page is the only one that
   // needs it, so it's fetched here instead of in App.jsx.
   const { flyovers, loading, error } = useFlyoverData();
-  const alerts = [
-    {
-      id: 1,
-      severity: "critical",
-      message: "High risk detected on Sector 4 flyover",
-      meta: "2 min ago",
-    },
-    {
-      id: 2,
-      severity: "warning",
-      message: "Visibility dropping below 5km near Ambala",
-      meta: "12 min ago",
-    },
-    {
-      id: 3,
-      severity: "info",
-      message: "Satellite pass completed for all active flyovers",
-      meta: "34 min ago",
-    },
-  ];
+  // const alerts = [
+  //   {
+  //     id: 1,
+  //     severity: "critical",
+  //     message: "High risk detected on Sector 4 flyover",
+  //     meta: "2 min ago",
+  //   },
+  //   {
+  //     id: 2,
+  //     severity: "warning",
+  //     message: "Visibility dropping below 5km near Ambala",
+  //     meta: "12 min ago",
+  //   },
+  //   {
+  //     id: 3,
+  //     severity: "info",
+  //     message: "Satellite pass completed for all active flyovers",
+  //     meta: "34 min ago",
+  //   },
+  // ];
   // Calculate stats from loaded data
   const stats =
     flyovers.length > 0
@@ -150,7 +150,7 @@ export default function DashboardPage() {
 return (
     <div className="flex flex-col gap-4 h-full">
       {/* Marquee sits above everything, full dashboard width */}
-      <AlertMarquee alerts={alerts} />
+      {/* <AlertMarquee alerts={alerts} /> */}
  
       <div className="flex flex-col lg:grid lg:grid-cols-10 gap-4 lg:gap-5 flex-1 min-h-0">
         {/* Left section — Maps (70%) */}
