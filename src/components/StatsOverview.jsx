@@ -7,87 +7,78 @@ const STATS = [
     id: "total-flyovers",
     label: "Flyovers",
     value: "28",
-    sub: "Monitored",
-    subColor: "text-blue-600",
+    sub: "28 monitored structures",
     icon: Waves,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-500",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    border: "from-blue-500 to-cyan-500",
   },
   {
     id: "critical-structures",
     label: "Critical Structures",
     value: "4",
-    sub: "14% of Total",
-    subColor: "text-gray-500",
+    sub: "Immediate inspection required",
     icon: TriangleAlert,
-    iconBg: "bg-red-50",
-    iconColor: "text-red-500",
+    iconBg: "bg-red-100",
+    iconColor: "text-red-600",
+    border: "from-red-500 to-orange-500",
   },
   {
     id: "active-alerts",
     label: "Active Alerts",
     value: "11",
-    sub: "View All Alerts",
-    subColor: "text-amber-600",
+    sub: "Weather and sensor alerts",
     icon: Bell,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-500",
+    iconBg: "bg-amber-100",
+    iconColor: "text-amber-600",
+    border: "from-amber-500 to-yellow-500",
   },
   {
     id: "health-index",
     label: "Health Index",
     value: "92%",
-    sub: "Good",
-    subColor: "text-emerald-600",
+    sub: "Overall structural health",
     icon: ShieldCheck,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-500",
+    iconBg: "bg-emerald-100",
+    iconColor: "text-emerald-600",
+    border: "from-emerald-500 to-green-500",
   },
-  // {
-  //   key: "total",
-  //   label: "Flyovers",
-  //   icon: Waypoints,
-  //   accent: "border-primary",
-  //   iconBg: "bg-primary/10",
-  //   iconColor: "text-primary",
-  // },
-  // {
-  //   key: "low",
-  //   label: "Low Risk",
-  //   icon: CheckCircle2,
-  //   accent: "border-success",
-  //   iconBg: "bg-success/10",
-  //   iconColor: "text-success",
-  // },
-  // {
-  //   key: "moderate",
-  //   label: "Moderate Risk",
-  //   icon: AlertTriangle,
-  //   accent: "border-warning",
-  //   iconBg: "bg-warning/10",
-  //   iconColor: "text-warning",
-  // },
-  // {
-  //   key: "high",
-  //   label: "High Risk",
-  //   icon: ShieldAlert,
-  //    accent: "border-red-500",
-  //   iconBg: "bg-danger/10",
-  //   iconColor: "text-danger",
-  // },
 ];
 
 function StatCard({ stat }) {
   const Icon = stat.icon;
+
   return (
-    <div className="flex items-center justify-between gap-3 bg-white rounded-xl2 shadow-card ring-1 ring-gray-100 px-4 py-3.5 flex-1 min-w-[150px]">
-      <div className="min-w-0">
-        <p className="text-[12px] text-gray-500 font-medium truncate">{stat.label}</p>
-        <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{stat.value}</p>
-        <p className={`text-[11px] font-semibold mt-0.5 ${stat.subColor}`}>{stat.sub}</p>
-      </div>
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${stat.iconBg}`}>
-        <Icon className={`w-5 h-5 ${stat.iconColor}`} strokeWidth={2.2} />
+    <div className="group relative flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+
+      {/* Top gradient */}
+      <div
+        className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${stat.border}`}
+      />
+
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            {stat.label}
+          </p>
+
+          <h2 className="mt-2 text-3xl font-bold text-slate-800">
+            {stat.value}
+          </h2>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {stat.sub}
+          </p>
+
+          {/* 
+           */}
+        </div>
+
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.iconBg}`}
+        >
+          <Icon className={`h-6 w-6 ${stat.iconColor}`} />
+        </div>
       </div>
     </div>
   );

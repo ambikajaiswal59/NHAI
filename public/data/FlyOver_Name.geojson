@@ -1,0 +1,11 @@
+{
+"type": "FeatureCollection",
+"name": "FlyOver_Name",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 2, "Chainage": "0+930", "Descriptio": "ROB", "Length": "171.5 Mtr", "Detail": "04 x 31.50 + 1 x 45.50 m", "Remarks": "NH 152", "NAME": "FLYOVER-3" }, "geometry": { "type": "Point", "coordinates": [ 76.738421280716636, 30.397589572120456 ] } },
+{ "type": "Feature", "properties": { "id": 3, "Chainage": "4+474", "Descriptio": "Flyover", "Length": "60 Mtr", "Detail": "02 x 30.00 m", "Remarks": "NH 152", "NAME": "FLYOVER-2" }, "geometry": { "type": "Point", "coordinates": [ 76.750238403102344, 30.408551349447148 ] } },
+{ "type": "Feature", "properties": { "id": 1, "Chainage": "5+194", "Descriptio": "MNB", "Length": "25.5 Mtr", "Detail": "01x25.5 m", "Remarks": "NH 152", "NAME": "FLYOVER-1" }, "geometry": { "type": "Point", "coordinates": [ 76.70774016318866, 30.213076392725945 ] } },
+{ "type": "Feature", "properties": { "id": 4, "Chainage": "5+362", "Descriptio": "ROB", "Length": "56 Mtr", "Detail": "01 x 56 m", "Remarks": "NH 152", "NAME": "FLYOVER-4" }, "geometry": { "type": "Point", "coordinates": [ 76.774168250679381, 30.412966477226878 ] } }
+]
+}

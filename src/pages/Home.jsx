@@ -34,7 +34,7 @@ export default function Home() {
       {/* Section 2: map — HomeMap now controls its own height (h-[640px]) internally,
           so no wrapping div with a conflicting height here. That mismatch was
           what caused it to overlap Section 3. */}
-      <div className="w-full h-135">
+      <div className="w-full h-125">
         <HomeMap />
       </div>
 
