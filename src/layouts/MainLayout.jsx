@@ -26,15 +26,24 @@ export default function MainLayout({ children, activeNav, onNavChange }) {
     <div
       className={`flex flex-col h-screen bg-dashboard overflow-hidden ${sidebarOpen ? "sidebar-open" : ""}`}
     >
-      {/* Header — full width, sits above everything else */}
+      {/* Header — persistent slot, sits above the scrolling area.
+          Desktop/tablet (>900px, matching Header's own internal
+          breakpoint): render the FULL header here, unchanged from before.
+          Mobile (<=900px): render ONLY the logo section here, so it's
+          the only piece that stays pinned while scrolling. */}
       <div className="flex-shrink-0 z-[9998]">
-        <Header />
+        <div className="hidden min-[901px]:block">
+          <Header />
+        </div>
+        <div className="max-[900px]:block hidden">
+          <Header only="logo" />
+        </div>
       </div>
 
       {/* Mobile Sidebar Toggle */}
       <button
         onClick={toggleSidebar}
-        className="lg:hidden fixed top-3 left-1 z-[9999] p-1.5 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
+        className="lg:hidden fixed top-4 left-1 z-[9999] p-1.5 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
         style={{ marginTop: "-2px" }}
       >
         {sidebarOpen ? (
@@ -74,6 +83,14 @@ export default function MainLayout({ children, activeNav, onNavChange }) {
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
+            {/* On mobile only, the title + status/calendar/admin section
+                lives HERE — inside the scrollable area — so it scrolls
+                out of view along with the page content, while the logo
+                above stays pinned. */}
+            <div className="max-[900px]:block hidden -m-3 sm:-m-4 lg:-m-5 mb-3">
+              <Header only="content" />
+            </div>
+
             {children}
           </div>
         </div>

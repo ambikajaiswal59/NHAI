@@ -11,6 +11,8 @@ import {
   Puzzle,
   Settings,
   HelpCircle,
+  Mountain,
+  TrafficCone,
 } from "lucide-react";
 import { ROUTES } from "../router/routes";
 
@@ -19,10 +21,12 @@ import { ROUTES } from "../router/routes";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.HOME },
   { label: "Flyovers", icon: Waypoints, id: ROUTES.DASHBOARD },
+  { label: "Terrain", icon: Mountain, id: ROUTES.TERRAIN },
+  { label: "Traffic", icon: TrafficCone, id: ROUTES.TRAFFIC },
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
   //{ label: "Monitoring", icon: Radar, id: ROUTES.MONITORING },
-  { label: "Alerts", icon: Bell, badge: 3 },
+  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS },
   { label: "Analytics", icon: BarChart3, id: ROUTES.ANALYTICS },
   { label: "Inspections", icon: ClipboardCheck, id: ROUTES.INSPECTIONS },
 
@@ -38,10 +42,10 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
   };
 
   return (
-    <aside className="w-37 h-screen rounded-tr-[10px] bg-[#0a1130] flex flex-col justify-between">
+    <aside className="w-37 h-screen  bg-[#0a1130] flex flex-col">
       <div>
         {/* Navigation */}
-        <nav className="mt-4 px-6 space-y-1">
+        <nav className="mt-4 px-6 ">
           {navItems.map(({ label, icon: Icon, id, badge }) => {
             const isActive = activeItem === id;
             return (
@@ -49,7 +53,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 key={label}
                 disabled={!id}
                 onClick={() => id && handleNavClick(id)}
-                className={`group relative w-full flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 ${
+                className={`group relative w-full flex flex-col items-center justify-center  py-2 rounded-xl text-[14px] font-medium transition-all duration-200 ${
                   !id
                     ? "cursor-not-allowed opacity-50"
                     : isActive
@@ -66,7 +70,9 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                       : "text-slate-400 group-hover:text-blue-400 flex-shrink-0"
                   }
                 />
-                <span className="leading-tight text-center">{label}</span>
+                <span className="leading-tight text-center text-white">
+                  {label}
+                </span>
 
                 {badge ? (
                   <span className="absolute top-1.5 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold">
