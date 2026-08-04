@@ -1,9 +1,10 @@
-
 import proj4 from 'proj4';
 
-const GEOJSON_PATH = '/data/Flyover_Roads.geojson';
+const ROADS_GEOJSON_PATH = '/data/Flyover_Roads.geojson';
+const NAMES_GEOJSON_PATH = '/data/FlyOver_Name.geojson'; // adjust if your actual filename differs
 
-// Source projection used in the exported shapefile
+// Source projection used in the exported shapefile (Flyover_Roads only —
+// FlyOver_Name is already WGS84 / CRS84, no reprojection needed there)
 const UTM43N = '+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs';
 const WGS84 = 'EPSG:4326';
 
@@ -22,7 +23,6 @@ const riskStatusMap = {
     'F3': 'high',
     'F4': 'low'
 };
-
 
 const toWgs84 = ([x, y]) => proj4(UTM43N, WGS84, [x, y]);
 
@@ -44,9 +44,70 @@ const convertFeature = (feature) => ({
     },
 });
 
+// Normalizes a highway string for matching regardless of spacing/case
+// differences between files (e.g. "NH 152" vs "NH152" vs "nh152").
+const normalizeHighway = (value) =>
+    (value || '').toString().toUpperCase().replace(/\s+/g, '');
+
+// Pulls a value off a feature's properties, trying multiple possible key
+// spellings, since exported shapefiles/GeoJSON often vary slightly.
+const findProp = (props, keys) => {
+    if (!props) return null;
+    for (const key of keys) {
+        if (props[key] !== undefined && props[key] !== null && props[key] !== '') {
+            return props[key];
+        }
+    }
+    return null;
+};
+
+// Loads the named-points file (FlyOver_Name.geojson) and groups its point
+// features by highway (via the Remarks field, e.g. "NH 152"), so each
+// highway group in loadFlyoverData can attach the points that belong to it.
+// Points are already in WGS84 (CRS84), so no reprojection is applied here.
+const loadNamedPointsByHighway = async () => {
+    try {
+        const response = await fetch(NAMES_GEOJSON_PATH);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch named points GeoJSON: ${response.status}`);
+        }
+        const geojson = await response.json();
+
+        const byHighway = {};
+        (geojson.features || []).forEach((feature, index) => {
+            const props = feature.properties || {};
+            const remarks = findProp(props, ['Remarks', 'remarks']);
+            const highwayKey = normalizeHighway(remarks);
+            if (!highwayKey) return;
+
+            const [lng, lat] = feature.geometry?.coordinates || [];
+            if (typeof lat !== 'number' || typeof lng !== 'number') return;
+
+            const point = {
+                id: findProp(props, ['id', 'ID']) ?? `point-${index + 1}`,
+                name: findProp(props, ['NAME', 'name']) || `Flyover ${index + 1}`,
+                chainage: findProp(props, ['Chainage', 'chainage']),
+                description: findProp(props, ['Descriptio', 'Description', 'description']),
+                length: findProp(props, ['Length', 'length']),
+                detail: findProp(props, ['Detail', 'detail', 'Details']),
+                remarks,
+                latlng: [lat, lng],
+            };
+
+            if (!byHighway[highwayKey]) byHighway[highwayKey] = [];
+            byHighway[highwayKey].push(point);
+        });
+
+        return byHighway;
+    } catch (error) {
+        console.error('Error loading named points GeoJSON:', error);
+        return {};
+    }
+};
+
 export const loadFlyoverData = async () => {
     try {
-        const response = await fetch(GEOJSON_PATH);
+        const response = await fetch(ROADS_GEOJSON_PATH);
         if (!response.ok) {
             throw new Error(`Failed to fetch GeoJSON: ${response.status}`);
         }
@@ -54,6 +115,10 @@ export const loadFlyoverData = async () => {
 
         // Reproject every feature to WGS84 up front, once
         const convertedFeatures = geojson.features.map(convertFeature);
+
+        // Load named points (Chainage/Descriptio/Length/Detail) and group
+        // them by highway so we can attach the right ones to each group below
+        const namedPointsByHighway = await loadNamedPointsByHighway();
 
         // Group features by Type
         const grouped = {};
@@ -106,16 +171,22 @@ export const loadFlyoverData = async () => {
                 .filter((_, i) => i % step === 0)
                 .map(([lng, lat]) => [lat, lng]);
 
+            const highway = highwayMap[type] || `Highway ${type}`;
 
+            // Attach the named points (labels/details) whose Remarks field
+            // matches this highway — points are label-only, the dropdown
+            // and details panel stay grouped at the highway level.
+            const namedPoints = namedPointsByHighway[normalizeHighway(highway)] || [];
 
             return {
                 id: index + 1,
-                highway: highwayMap[type] || `Highway ${type}`,
+                highway,
                 riskStatus: riskStatusMap[type] || 'low',
                 center,
                 path,
-                geojson: featureCollection, // NEW: actual polygon layer, in WGS84
-                type
+                geojson: featureCollection, // actual polygon layer, in WGS84
+                type,
+                namedPoints,
             };
         }).filter(f => f !== null);
 
