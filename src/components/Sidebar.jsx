@@ -38,7 +38,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
   };
 
   return (
-    <aside className="w-40 h-screen bg-[#0a1130] flex flex-col justify-between">
+    <aside className="w-37 h-screen rounded-tr-[10px] bg-[#0a1130] flex flex-col justify-between">
       <div>
         {/* Navigation */}
         <nav className="mt-4 px-6 space-y-1">
