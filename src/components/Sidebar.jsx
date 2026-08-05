@@ -71,7 +71,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 </span>
 
                 {badge ? (
-                  <span className="absolute top-1.5 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                  <span className="absolute top-1.5 right-8 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold">
                     {badge}
                   </span>
                 ) : null}
