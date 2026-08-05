@@ -1,5 +1,4 @@
 // src/pages/Home.jsx
-import StatsOverview from "../components/StatsOverview";
 import HomeMap from "../components/HomeMap";
 import FlyoverHealthOverview from "../components/FlyoverHealthOverview";
 import AlertMarquee from "../components/AlertMarquess";
@@ -25,21 +24,19 @@ export default function Home() {
       meta: "34 min ago",
     },
   ];
+
   return (
-    <div className="w-full h-full flex flex-col gap-4 px-4  overflow-y-auto">
+    <div className="w-full flex flex-col gap-4 px-4">
       <AlertMarquee alerts={alerts} />
 
-      {/* Section 1: stat cards */}
-      <StatsOverview />
-
-      {/* Section 2: map — HomeMap now controls its own height (h-[640px]) internally,
-          so no wrapping div with a conflicting height here. That mismatch was
-          what caused it to overlap Section 3. */}
-      <div className="w-full h-125">
+      {/* min-h-[560px] is a hard floor — guarantees this row is never
+          0px even if the flex-height chain from MainLayout doesn't
+          fully resolve. flex-1 still lets it grow taller when more
+          space actually is available. */}
+      <div className="w-full min-h-[560px]flex-1">
         <HomeMap />
       </div>
 
-      {/* Section 3: Flyover Health Overview */}
       <FlyoverHealthOverview />
     </div>
   );

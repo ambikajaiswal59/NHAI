@@ -4,8 +4,7 @@ import DashboardPage from "../pages/DashboardPage";
 import WeatherMapPage from "../pages/WeatherMapPage";
 import ReportsPage from "../pages/ReportsPage";
 import Alertspage from "../pages/AlertsPage";
-import AnalyticsPage from "../pages/AnalyticsPage";
-import InspectionsPage from "../pages/InspectionsPage";
+
 import TerrainPage from "../pages/TerrainPage";
 import TrafficPage from "../pages/TrafiicPage";
 
@@ -18,9 +17,6 @@ export const ROUTES = {
     TRAFFIC: "traffic",
     REPORTS: "reports",
     ALERTS: "alerts",
-    ANALYTICS: "analytics",
-    INSPECTIONS: "inspections",
-    
 
 };
 
@@ -33,8 +29,7 @@ export const PAGE_COMPONENTS = {
     [ROUTES.TRAFFIC]: TrafficPage,
     [ROUTES.REPORTS]: ReportsPage,
     [ROUTES.ALERTS]: Alertspage,
-    [ROUTES.ANALYTICS]: AnalyticsPage,
-    [ROUTES.INSPECTIONS]: InspectionsPage,
+
     
 };
 
