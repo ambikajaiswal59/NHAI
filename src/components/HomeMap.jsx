@@ -21,7 +21,6 @@ import {
   Layers,
   Calendar,
 } from "lucide-react";
-
 import { loadFlyoverData } from "../utils/geoJsonParser";
 import { useWeather } from "../hooks/useWeather";
 import WeatherPanel from "../components/WeatherPanel";
@@ -575,7 +574,6 @@ export default function HomeMap() {
     );
   }, [flyoverMarkers]);
 
-
   return (
     <div
       ref={mapWrapperRef}
@@ -675,7 +673,7 @@ export default function HomeMap() {
         <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-3 min-h-0">
           <StatsOverview />
 
-          <div className="flex-1 min-h-0 rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
+          <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
             <div className="flex-1 overflow-y-auto">
               <FlyoverDetailsPanel
                 selectedHighway={selectedHighway}
