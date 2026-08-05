@@ -26,7 +26,7 @@ const navItems = [
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
   //{ label: "Monitoring", icon: Radar, id: ROUTES.MONITORING },
-  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }  // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
+  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }, // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
 ];
 
 export default function Sidebar({ activeItem, onNavClick, onClose }) {
