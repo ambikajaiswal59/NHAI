@@ -26,11 +26,7 @@ const navItems = [
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
   //{ label: "Monitoring", icon: Radar, id: ROUTES.MONITORING },
-  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS },
-  { label: "Analytics", icon: BarChart3, id: ROUTES.ANALYTICS },
-  { label: "Inspections", icon: ClipboardCheck, id: ROUTES.INSPECTIONS },
-
-  // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
+  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }  // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
 ];
 
 export default function Sidebar({ activeItem, onNavClick, onClose }) {
@@ -45,7 +41,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
     <aside className="w-37 h-screen  bg-[#0a1130] flex flex-col">
       <div>
         {/* Navigation */}
-        <nav className="mt-4 px-6 ">
+        <nav className="mt-4 px-6 space-y-3">
           {navItems.map(({ label, icon: Icon, id, badge }) => {
             const isActive = activeItem === id;
             return (
@@ -62,7 +58,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 }`}
               >
                 <Icon
-                  size={20}
+                  size={24}
                   strokeWidth={isActive ? 2.25 : 2}
                   className={
                     isActive

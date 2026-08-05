@@ -131,7 +131,6 @@ export default function FlyoverDetailsPanel({
             {visibleHighways.map((f) => (
               <button
                 key={f.id}
-                onClick={() => onSelectHighway(f)}
                 className="w-full flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:border-gray-200 hover:bg-gray-50 text-left transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">

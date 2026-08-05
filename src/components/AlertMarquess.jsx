@@ -1,9 +1,4 @@
-// components/AlertMarquee.jsx
 import { ShieldCheck } from "lucide-react";
-
-// No severity system, no alerts array — just one message ticking across
-// a bold, solid-color bar. Simpler by design: this is a status line, not
-// a notification feed.
 export default function AlertMarquee({
   message = "No untoward incident reported",
   speed = 18, // seconds for one full pass — lower = faster
@@ -13,7 +8,7 @@ export default function AlertMarquee({
   const items = Array.from({ length: 10 });
 
   return (
-    <div className="relative flex items-center gap-3 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl2 shadow-card pl-4 pr-4 py-2.5 flex-shrink-0 overflow-hidden">
+    <div className="relative flex h-[25px] items-center gap-3 bg-gradient-to-r from-emerald-500 to-emerald-600  rounded-xl2 shadow-card pl-4 pr-4 py-2 flex-shrink-0 overflow-hidden">
       {/* live pulse */}
       <div className="flex items-center gap-1.5 shrink-0 bg-white/95 rounded-full px-4.5 py-1 shadow-sm ">
         <span className="relative flex h-2 w-2">

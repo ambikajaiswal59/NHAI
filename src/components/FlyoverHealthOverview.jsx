@@ -1,14 +1,34 @@
 // FlyoverHealthOverview.jsx
 // Section 3 — flyover health card row (matches reference image 2's "Flyover Health Overview")
 import { ChevronRight } from "lucide-react";
-import FlyoverImage1 from "../assets/flyover-bridge-construction.png"
-import FlyoverImage2 from "../assets/FlyoverBridgetwo.jpg"
+import FlyoverImage1 from "../assets/flyover-bridge-construction.png";
+import FlyoverImage2 from "../assets/FlyoverBridgetwo.jpg";
 
 const STATUS_STYLES = {
-  Critical: { badge: "bg-red-600", text: "text-red-600", line: "#DC2626", track: "bg-red-50" },
-  High: { badge: "bg-orange-500", text: "text-orange-500", line: "#F97316", track: "bg-orange-50" },
-  Moderate: { badge: "bg-amber-400 text-gray-900", text: "text-amber-500", line: "#F59E0B", track: "bg-amber-50" },
-  Low: { badge: "bg-emerald-500", text: "text-emerald-600", line: "#10B981", track: "bg-emerald-50" },
+  Critical: {
+    badge: "bg-red-600",
+    text: "text-red-600",
+    line: "#DC2626",
+    track: "bg-red-50",
+  },
+  High: {
+    badge: "bg-orange-500",
+    text: "text-orange-500",
+    line: "#F97316",
+    track: "bg-orange-50",
+  },
+  Moderate: {
+    badge: "bg-amber-400 text-gray-900",
+    text: "text-amber-500",
+    line: "#F59E0B",
+    track: "bg-amber-50",
+  },
+  Low: {
+    badge: "bg-emerald-500",
+    text: "text-emerald-600",
+    line: "#10B981",
+    track: "bg-emerald-50",
+  },
 };
 
 const FLYOVERS = [
@@ -70,8 +90,19 @@ function Sparkline({ points, color }) {
     .join(" ");
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-8" preserveAspectRatio="none">
-      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="w-full h-8"
+      preserveAspectRatio="none"
+    >
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -94,7 +125,9 @@ function FlyoverCard({ flyover }) {
           {flyover.status}
         </span>
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2">
-          <p className="text-white text-sm font-bold leading-none">{flyover.name}</p>
+          <p className="text-white text-sm font-bold leading-none">
+            {flyover.name}
+          </p>
           <p className="text-white/80 text-[11px] mt-0.5">{flyover.location}</p>
         </div>
       </div>
@@ -103,7 +136,9 @@ function FlyoverCard({ flyover }) {
       <div className="px-4 py-3">
         <p className="text-[11px] text-gray-500">Movement (mm)</p>
         <div className="flex items-center justify-between">
-          <p className={`text-xl font-bold ${style.text}`}>{flyover.movement}</p>
+          <p className={`text-xl font-bold ${style.text}`}>
+            {flyover.movement}
+          </p>
         </div>
         <p className="text-[10px] text-gray-400 -mt-0.5">(Last 12 days)</p>
 
@@ -114,7 +149,9 @@ function FlyoverCard({ flyover }) {
         <div className="flex items-center justify-between mt-3">
           <div>
             <p className="text-[11px] text-gray-500">Health Score</p>
-            <p className={`text-lg font-bold ${style.text}`}>{flyover.healthScore}%</p>
+            <p className={`text-lg font-bold ${style.text}`}>
+              {flyover.healthScore}%
+            </p>
           </div>
           <button className="flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:text-blue-700">
             View Details
@@ -130,7 +167,9 @@ export default function FlyoverHealthOverview() {
   return (
     <div className="w-full bg-white rounded-xl2 shadow-card ring-1 ring-gray-100 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[15px] font-bold text-gray-900">Flyover Health Overview</h2>
+        <h2 className="text-[15px] font-bold text-gray-900">
+          Flyover Health Overview
+        </h2>
         {/* <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-700">
           View All
         </button> */}

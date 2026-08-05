@@ -1,6 +1,13 @@
 // StatsOverview.jsx
 // Section 1 — top row of summary stat cards (matches reference image 1)
-import { Waves, TriangleAlert, Bell, ShieldCheck, Satellite, BrainCircuit } from "lucide-react";
+import {
+  Waves,
+  TriangleAlert,
+  Bell,
+  ShieldCheck,
+  Satellite,
+  BrainCircuit,
+} from "lucide-react";
 
 const STATS = [
   {
@@ -49,8 +56,7 @@ function StatCard({ stat }) {
   const Icon = stat.icon;
 
   return (
-    <div className="group relative flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-
+    <div className="group relative flex h-full min-h-[100px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
       {/* Top gradient */}
       <div
         className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${stat.border}`}
@@ -65,28 +71,23 @@ function StatCard({ stat }) {
           <h2 className="mt-2 text-3xl font-bold text-slate-800">
             {stat.value}
           </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            {stat.sub}
-          </p>
-
-          {/* 
-           */}
         </div>
 
         <div
-          className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.iconBg}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${stat.iconBg}`}
         >
           <Icon className={`h-6 w-6 ${stat.iconColor}`} />
         </div>
       </div>
+
+      <p className="mt-1 text-xs text-slate-500">{stat.sub}</p>
     </div>
   );
 }
 
 export default function StatsOverview() {
   return (
-    <div className="w-full flex flex-wrap gap-3">
+    <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5 auto-rows-fr">
       {STATS.map((stat) => (
         <StatCard key={stat.id} stat={stat} />
       ))}
