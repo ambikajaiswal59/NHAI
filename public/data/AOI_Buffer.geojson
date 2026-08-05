@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "AOI_Buffer",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::32643" } },
+"features": [
+{ "type": "Feature", "properties": { "OBJECTID": null, "Type": null, "Risk SCore": null, "RiskCatego": null }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 649838.768376252730377, 3376139.91150871431455 ], [ 689961.464277381426655, 3376080.994187273550779 ], [ 690668.47213467140682, 3330125.483463511336595 ], [ 650427.941590659786016, 3329241.723641903139651 ], [ 649838.768376252730377, 3376139.91150871431455 ] ] ] ] } }
+]
+}

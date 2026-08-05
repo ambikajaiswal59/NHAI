@@ -6,8 +6,8 @@ const STATS = [
   {
     id: "total-flyovers",
     label: "Flyovers",
-    value: "28",
-    sub: "28 monitored structures",
+    value: "4",
+    sub: "4 monitored structures",
     icon: Waves,
     iconBg: "bg-blue-100",
     iconColor: "text-blue-600",
@@ -16,7 +16,7 @@ const STATS = [
   {
     id: "critical-structures",
     label: "Critical Structures",
-    value: "4",
+    value: "3",
     sub: "Immediate inspection required",
     icon: TriangleAlert,
     iconBg: "bg-red-100",
@@ -26,7 +26,7 @@ const STATS = [
   {
     id: "active-alerts",
     label: "Active Alerts",
-    value: "11",
+    value: "3",
     sub: "Weather and sensor alerts",
     icon: Bell,
     iconBg: "bg-amber-100",

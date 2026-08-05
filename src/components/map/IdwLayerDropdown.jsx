@@ -21,7 +21,7 @@ export default function IdwLayerDropdown({
   const [tempDate, setTempDate] = useState(selectedDate || '');
 
   const selectedLabel =
-    IDW_LAYER_OPTIONS.find((o) => o.id === selectedId)?.label || "IDW Layer";
+    IDW_LAYER_OPTIONS.find((o) => o.id === selectedId)?.label || "Weather";
 
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return "Select Date";
