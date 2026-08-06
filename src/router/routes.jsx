@@ -30,7 +30,7 @@ export const PAGE_COMPONENTS = {
     [ROUTES.REPORTS]: ReportsPage,
     [ROUTES.ALERTS]: Alertspage,
 
-    
+
 };
 
 // Helper to get page component by route

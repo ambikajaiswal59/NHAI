@@ -1,5 +1,3 @@
-// FlyoverHealthOverview.jsx
-// Section 3 — flyover health card row (matches reference image 2's "Flyover Health Overview")
 import { ChevronRight } from "lucide-react";
 import FlyoverImage1 from "../assets/flyover-bridge-construction.png";
 import FlyoverImage2 from "../assets/FlyoverBridgetwo.jpg";

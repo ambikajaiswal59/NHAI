@@ -97,14 +97,14 @@ export function makeFlyoverIcon({ color, labelText, detailed, name, detailFields
 
   const detailRows = detailed
     ? detailFields
-        .map(
-          (f) => `
+      .map(
+        (f) => `
         <div style="display:flex; justify-content:space-between; gap:6px; padding:1.5px 0;">
           <span style="color:#9ca3af; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; flex-shrink:0;">${f.label}</span>
           <span style="color:#1f2937; font-size:10px; font-weight:600; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${f.value}</span>
         </div>`,
-        )
-        .join("")
+      )
+      .join("")
     : "";
 
   const labelBlock = detailed
@@ -118,15 +118,14 @@ export function makeFlyoverIcon({ color, labelText, detailed, name, detailFields
           box-shadow: 0 2px 8px rgba(0,0,0,0.25);
           width: ${width}px;
       ">
-        ${
-          name
-            ? `<div style="font-size:12px; font-weight:700; color:#111827; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>`
-            : ""
-        }
+        ${name
+      ? `<div style="font-size:12px; font-weight:700; color:#111827; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>`
+      : ""
+    }
         ${detailRows}
       </div>`
     : labelText
-    ? `<div style="
+      ? `<div style="
           background: white;
           border: 1px solid ${color}55;
           padding: 2px 7px;
@@ -140,7 +139,7 @@ export function makeFlyoverIcon({ color, labelText, detailed, name, detailFields
           overflow: hidden;
           text-overflow: ellipsis;
       ">${labelText}</div>`
-    : "";
+      : "";
 
   return L.divIcon({
     className: "flyover-marker-icon",

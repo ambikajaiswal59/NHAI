@@ -73,15 +73,54 @@ body {
 }
 
 .leaflet-popup-content-wrapper {
-  padding: 0;
-  border-radius: 20px;
-  overflow: hidden;
+    padding: 0;
+    border-radius: 20px;
+    overflow: hidden;
 }
 
 .leaflet-popup-content {
-  margin: 0;
+    margin: 0;
 }
 
 .leaflet-popup-tip {
-  box-shadow: none;
+    box-shadow: none;
+}
+
+
+
+
+
+
+/* Fix for layers toggle button - use !important and more specific selector */
+.leaflet-control-layers-toggle {
+    width: 30px !important;
+    height: 30px !important;
+    background-size: 24px 24px !important;
+    /* Adjust icon size */
+}
+
+/* If you want both touch and non-touch devices */
+.leaflet-touch .leaflet-control-layers-toggle,
+.leaflet-control-layers-toggle {
+    width: 30px !important;
+    height: 30px !important;
+    background-size: 24px 24px !important;
+}
+
+/* Control the size of zoom buttons */
+.leaflet-touch .leaflet-control-zoom-in,
+.leaflet-touch .leaflet-control-zoom-out,
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 22px !important;
+    line-height: 30px !important;
+    /* Should match height */
+}
+
+/* Control the zoom container border radius */
+.leaflet-touch .leaflet-control-zoom,
+.leaflet-control-zoom {
+    border-radius: 8px !important;
 }

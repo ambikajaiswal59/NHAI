@@ -147,16 +147,16 @@ export default function DashboardPage() {
     );
   }
 
-return (
+  return (
     <div className="flex flex-col gap-4 h-full">
       {/* Marquee sits above everything, full dashboard width */}
       {/* <AlertMarquee alerts={alerts} /> */}
- 
+
       <div className="flex flex-col lg:grid lg:grid-cols-10 gap-4 lg:gap-5 flex-1 min-h-0">
         {/* Left section — Maps (70%) */}
         <div className="lg:col-span-8 flex flex-col gap-4">
           <StatsCards stats={stats} />
- 
+
           {/* Flyover Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:flex-1 lg:min-h-0">
             {flyovers.map((f) => (
@@ -175,7 +175,7 @@ return (
               </div>
             ))}
           </div>
- 
+
           <div className="flex items-center justify-center gap-2 bg-white border border-gray-100 rounded-xl2 shadow-card px-4 py-2.5 mt-1 shrink-0">
             <span className="flex items-center justify-center w-5 h-5 rounded-full bg-warning/10 shrink-0">
               <span className="text-warning text-[11px]">⚠️</span>
@@ -185,7 +185,7 @@ return (
             </p>
           </div>
         </div>
- 
+
         {/* Weather Panel — 30% */}
         <div className="lg:col-span-2 mt-4 lg:mt-0 h-155 lg:h-full">
           <WeatherPanel weather={weather} loading={weatherLoading} />

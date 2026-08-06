@@ -138,11 +138,11 @@ export default function IdwLayerDropdown({
       {error && !isLoading && (
         <span className="text-[10px] text-red-600 font-medium">{error}</span>
       )}
-      {!isLoading && !error && dataCount > 0 && selectedId && (
+      {/* {!isLoading && !error && dataCount > 0 && selectedId && (
         <span className="text-[10px] text-green-600 font-medium">
           {dataCount} stations
         </span>
-      )}
+      )} */}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // StatsOverview.jsx
-// Section 1 — top row of summary stat cards (matches reference image 1)
+// 4 CARDS in right side )
 import {
   Waves,
   TriangleAlert,
