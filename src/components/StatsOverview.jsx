@@ -56,7 +56,7 @@ function StatCard({ stat }) {
   const Icon = stat.icon;
 
   return (
-    <div className="group relative flex h-full min-h-[100px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <div className="group relative flex w-full min-h-[120px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
       {/* Top gradient */}
       <div
         className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${stat.border}`}
@@ -64,7 +64,7 @@ function StatCard({ stat }) {
 
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
             {stat.label}
           </p>
 
@@ -76,11 +76,11 @@ function StatCard({ stat }) {
         <div
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${stat.iconBg}`}
         >
-          <Icon className={`h-6 w-6 ${stat.iconColor}`} />
+          <Icon className={`h-4 w-4 ${stat.iconColor}`} />
         </div>
       </div>
 
-      <p className="mt-1 text-xs text-slate-500">{stat.sub}</p>
+      <p className="text-[8px] text-slate-500">{stat.sub}</p>
     </div>
   );
 }

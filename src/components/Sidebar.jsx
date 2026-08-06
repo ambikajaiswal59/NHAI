@@ -26,7 +26,7 @@ const navItems = [
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
   //{ label: "Monitoring", icon: Radar, id: ROUTES.MONITORING },
-  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }  // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
+  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }, // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
 ];
 
 export default function Sidebar({ activeItem, onNavClick, onClose }) {
@@ -71,7 +71,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 </span>
 
                 {badge ? (
-                  <span className="absolute top-1.5 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                  <span className="absolute top-1.5 right-8 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold">
                     {badge}
                   </span>
                 ) : null}
