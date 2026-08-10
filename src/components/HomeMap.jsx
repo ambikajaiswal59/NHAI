@@ -690,12 +690,11 @@ export default function HomeMap() {
               onClick={handleToggleTrafficMap}
               className={`
                 flex items-center justify-center gap-1
-                px-2 py-0.3
+                px-2 py-1
                 rounded-lg
                 shadow-md
                 transition-all duration-200
-                text-s
-                font-medium
+              text-[12px] font-semibold text-gray-700 hover:bg-gray-50
                 whitespace-nowrap
                 ${
                   showTrafficMap
