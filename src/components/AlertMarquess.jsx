@@ -8,7 +8,7 @@ export default function AlertMarquee({
   const items = Array.from({ length: 10 });
 
   return (
-    <div className="relative flex h-[25px] items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-400 rounded-xl2 pl-4 pr-4 py-2 flex-shrink-0 overflow-hidden">
+    <div className="relative flex h-[25px] items-center gap-3 bg-[#0a1130]  rounded-xl2 pl-4 pr-4 py-2 flex-shrink-0 overflow-hidden">
       {/* live pulse */}
       <div className="flex items-center gap-1.5 -ml-3 shrink-0 h-5 bg-white rounded-full px-2 py-1 shadow-sm border border-red-100">
         <span className="relative flex h-2 w-2">
@@ -24,8 +24,8 @@ export default function AlertMarquee({
 
       {/* scrolling track */}
       <div className="relative flex-1 overflow-hidden">
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-blue-600 to-transparent z-10" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-blue-400 to-transparent z-10" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-6  z-10" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-6  z-10" />
 
         <div
           className="flex w-max"

@@ -1,23 +1,29 @@
 import { useState } from "react";
 import { ChevronDown, Waypoints, Check } from "lucide-react";
 
-export default function FlyoverDropdown({ flyovers, visibleIds, onToggle, onToggleAll }) {
+export default function FlyoverDropdown({
+  flyovers,
+  visibleIds,
+  onToggle,
+  onToggleAll,
+}) {
   const [open, setOpen] = useState(false);
 
-  const allSelected = flyovers.length > 0 && visibleIds.size === flyovers.length;
+  const allSelected =
+    flyovers.length > 0 && visibleIds.size === flyovers.length;
   const noneSelected = visibleIds.size === 0;
 
   const label = allSelected
     ? "Flyovers"
     : noneSelected
-    ? "No Flyovers"
-    : `${visibleIds.size} of ${flyovers.length} Flyovers`;
+      ? "No Flyovers"
+      : `${visibleIds.size} of ${flyovers.length} Flyovers`;
 
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-3 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
+        className="flex items-center gap-2 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-3 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
       >
         <Waypoints className="w-3.5 h-3.5 text-blue-500" />
         {label}
@@ -26,7 +32,10 @@ export default function FlyoverDropdown({ flyovers, visibleIds, onToggle, onTogg
 
       {open && (
         <>
-          <div className="fixed inset-0 z-[499]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed inset-0 z-[499]"
+            onClick={() => setOpen(false)}
+          />
           <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 py-1 z-[500] overflow-hidden">
             <button
               onClick={onToggleAll}
@@ -41,16 +50,7 @@ export default function FlyoverDropdown({ flyovers, visibleIds, onToggle, onTogg
                   key={f.id}
                   onClick={() => onToggle(f.id)}
                   className="w-full flex items-center gap-2 text-left px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  <span
-                    className="w-3.5 h-3.5 rounded flex items-center justify-center flex-shrink-0"
-                    style={{
-                      background: checked ? f.color : "transparent",
-                      border: `1.5px solid ${f.color}`,
-                    }}
-                  >
-                    {checked && <Check className="w-2.5 h-2.5 text-white" />}
-                  </span>
+                >  
                   <span className="truncate">{f.displayName}</span>
                 </button>
               );

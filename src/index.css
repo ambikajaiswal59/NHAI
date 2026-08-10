@@ -1,126 +1,155 @@
 @import "tailwindcss";
 
 @theme {
-    --color-primary: #2563EB;
-    --color-secondary: #0EA5E9;
-    --color-success: #10B981;
-    --color-warning: #F59E0B;
-    --color-danger: #EF4444;
-    --color-dashboard: #F5F7FB;
-    --color-card: #FFFFFF;
+  --color-primary: #2563eb;
+  --color-secondary: #0ea5e9;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-dashboard: #f5f7fb;
+  --color-card: #ffffff;
 
-    --radius-xl2: 20px;
+  --radius-xl2: 20px;
 
-    --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 /* Mobile responsive utilities */
+/* ============================================================
+   MOBILE MAP CONTROLS
+   ============================================================ */
+@media (max-width: 639px) {
+  /* Move Leaflet + / - controls below the top buttons */
+  .leaflet-top.leaflet-left {
+    top: 65px !important;
+  }
+
+  /* Smaller zoom buttons */
+  .leaflet-control-zoom a {
+    width: 30px !important;
+    height: 30px !important;
+    line-height: 30px !important;
+    font-size: 18px !important;
+  }
+
+  .leaflet-control-zoom {
+    margin-left: 8px !important;
+    margin-top: 8px !important;
+  }
+}
 @layer utilities {
-
-    /* Extra small screens (phones) */
-    @media (max-width: 480px) {
-        .xs\:block {
-            display: block;
-        }
-
-        .xs\:inline {
-            display: inline;
-        }
-
-        .xs\:hidden {
-            display: none;
-        }
-
-        .xs\:h-56 {
-            height: 14rem;
-        }
+  /* Extra small screens (phones) */
+  @media (max-width: 480px) {
+    .xs\:block {
+      display: block;
     }
+
+    .xs\:inline {
+      display: inline;
+    }
+
+    .xs\:hidden {
+      display: none;
+    }
+
+    .xs\:h-56 {
+      height: 14rem;
+    }
+  }
 }
 
 /* Smooth sidebar transitions */
 .sidebar-transition {
-    transition: transform 0.3s ease-in-out;
+  transition: transform 0.3s ease-in-out;
 }
 
 /* Custom scrollbar for better mobile experience */
 ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
+  background: #f1f1f1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
+  background: #c1c1c1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+  background: #a8a8a8;
 }
 
 /* Prevent text selection on mobile */
 * {
-    -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-    font-family: "Inter", sans-serif;
-    background: #f5f7fb;
+  font-family: "Inter", sans-serif;
+  background: #f5f7fb;
 }
 
 .leaflet-popup-content-wrapper {
-    padding: 0;
-    border-radius: 20px;
-    overflow: hidden;
+  padding: 0;
+  border-radius: 20px;
+  overflow: hidden;
 }
 
 .leaflet-popup-content {
-    margin: 0;
+  margin: 0;
 }
 
 .leaflet-popup-tip {
-    box-shadow: none;
+  box-shadow: none;
 }
-
-
-
-
-
 
 /* Fix for layers toggle button - use !important and more specific selector */
 .leaflet-control-layers-toggle {
-    width: 30px !important;
-    height: 30px !important;
-    background-size: 24px 24px !important;
-    /* Adjust icon size */
+  width: 30px !important;
+  height: 30px !important;
+  background-size: 24px 24px !important;
 }
 
 /* If you want both touch and non-touch devices */
 .leaflet-touch .leaflet-control-layers-toggle,
 .leaflet-control-layers-toggle {
-    width: 30px !important;
-    height: 30px !important;
-    background-size: 24px 24px !important;
+  width: 30px !important;
+  height: 30px !important;
+  background-size: 24px 24px !important;
 }
+
+/* Position the expanded layers panel */
+/* Position the expanded layers panel */
 
 /* Control the size of zoom buttons */
 .leaflet-touch .leaflet-control-zoom-in,
 .leaflet-touch .leaflet-control-zoom-out,
 .leaflet-control-zoom-in,
 .leaflet-control-zoom-out {
-    width: 30px !important;
-    height: 30px !important;
-    font-size: 22px !important;
-    line-height: 30px !important;
-    /* Should match height */
+  width: 30px !important;
+  height: 30px !important;
+  font-size: 22px !important;
+  line-height: 30px !important;
+  /* Should match height */
 }
 
 /* Control the zoom container border radius */
 .leaflet-touch .leaflet-control-zoom,
 .leaflet-control-zoom {
-    border-radius: 8px !important;
+  border-radius: 8px !important;
+}
+
+/* Google Maps fullscreen button */
+.google-map-container .gm-control-active[title="Toggle fullscreen view"] {
+  transform: translate(-10px,35px);
+}
+
+@media (max-width: 640px) {
+  .google-map-container .gm-fullscreen-control {
+    display: none !important;
+  }
 }
