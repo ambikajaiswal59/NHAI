@@ -276,15 +276,25 @@ export default function HomeMap() {
   const mapWrapperRef = useRef(null);
   const mapRef = useRef(null);
 
-  // ============================================================
-  // 2. DERIVED DATA (useMemo)
-  // ============================================================
+
   const flyoverMarkers = useMemo(() => {
-    return flyoversList.map((flyover, index) => ({
-      ...flyover,
-      color: getFlyoverColor(index),
-      displayName: getFlyoverDisplayName(flyover.type, index),
-    }));
+
+
+    const markers = flyoversList.map((flyover, index) => {
+      const color = getFlyoverColor(index);
+      const displayName = getFlyoverDisplayName(flyover.type, index);
+
+
+      return {
+        ...flyover,
+        color: color,
+        displayName: displayName,
+      };
+    });
+
+
+
+    return markers;
   }, [flyoversList]);
 
   const isDetailZoom = currentZoom >= DETAIL_LABEL_ZOOM;
@@ -685,7 +695,7 @@ export default function HomeMap() {
               flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 
               rounded-lg shadow-md 
               transition-all duration-200 
-              text-[10px] sm:text-xs font-medium
+              text-[8px] sm:text-xs lg:text-sm font-[600]
               ${showTrafficMap
                 ? 'bg-blue-500 text-white hover:bg-blue-600'
                 : 'bg-white/95 text-gray-700 hover:bg-gray-50 border border-gray-200'

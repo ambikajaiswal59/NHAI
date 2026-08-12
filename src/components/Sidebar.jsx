@@ -21,7 +21,7 @@ import { ROUTES } from "../router/routes";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.HOME },
   { label: "Flyovers", icon: Waypoints, id: ROUTES.DASHBOARD },
-  { label: "Terrain", icon: Mountain, id: ROUTES.TERRAIN },
+  { label: "Topography", icon: Mountain, id: ROUTES.TERRAIN },
   { label: "Traffic", icon: TrafficCone, id: ROUTES.TRAFFIC },
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
@@ -49,13 +49,12 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 key={label}
                 disabled={!id}
                 onClick={() => id && handleNavClick(id)}
-                className={`group relative w-full flex flex-col items-center justify-center  py-2 rounded-xl text-[14px] font-medium transition-all duration-200 ${
-                  !id
-                    ? "cursor-not-allowed opacity-50"
-                    : isActive
-                      ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-900/40"
-                      : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
+                className={`group relative w-full flex flex-col items-center justify-center  py-2 rounded-xl text-[14px] font-medium transition-all duration-200 ${!id
+                  ? "cursor-not-allowed opacity-50"
+                  : isActive
+                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-900/40"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  }`}
               >
                 <Icon
                   size={24}

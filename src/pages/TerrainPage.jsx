@@ -1,14 +1,57 @@
-// pages/TerrainPage.jsx
-import { Mountain } from "lucide-react";
+// src/pages/TerrainPage.jsx
+import Terrain from "../components/Terrain";
 
 export default function TerrainPage() {
     return (
-        <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-                <Mountain className="mx-auto mb-3 text-secondary" size={40} />
-                <p className="text-gray-700 font-semibold">Terrain</p>
-                <p className="text-gray-400 text-sm mt-1">Coming soon</p>
-            </div>
+        <div className="w-full h-full p-4 bg-gray-50">
+            <Terrain />
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
+
+// import Terrain from "../components/Terrain";
+
+// export default function TerrainPage() {
+//     return (
+//         <div className="w-full h-full p-4 bg-gray-50">
+//             <Terrain
+//                 mapCenter={[30.3, 76.7]}
+//                 mapZoom={10}
+//                 defaultTab="lulc"
+//                 className="h-full"
+//             />
+//         </div>
+//     );
+// }
+
+
+
+
+
+
+
+
+// import LandUseLandCover from "../components/LandUseLandCover";
+
+// export default function TerrainPage() {
+//     return (
+//         <div className="w-full h-full p-2 bg-gray-50">
+//             <LandUseLandCover
+//                 mapCenter={[30.3, 76.7]}
+//                 mapZoom={12}
+//                 defaultLeftYear={2017}
+//                 defaultRightYear={2025}
+//             />
+//         </div>
+//     );
+// }
+

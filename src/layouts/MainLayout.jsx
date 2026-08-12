@@ -80,8 +80,8 @@ export default function MainLayout({ children, activeNav, onNavChange }) {
               (percentage) resolving through a non-flex ancestor —
               which was collapsing to 0 and causing the blank map /
               overlapping cards. */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5 flex flex-col min-h-0">
-            <div className="max-[900px]:block hidden -m-3 sm:-m-4 lg:-m-5 mb-3">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-2 lg:p-3 flex flex-col min-h-0">
+            <div className="max-[900px]:block hidden -m-3 sm:-m-40 lg:-m-50 mb-3">
               <Header only="content" />
             </div>
 
