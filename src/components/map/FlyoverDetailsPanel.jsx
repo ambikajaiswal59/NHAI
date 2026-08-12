@@ -1,4 +1,4 @@
-import { MapPin } from "lucide-react";
+import { Waypoints } from "lucide-react";
 import StatChip from "./StatChip";
 import { getHighwayDetailFields, formatPointName } from "./mapHelpers";
 
@@ -10,7 +10,9 @@ export default function FlyoverDetailsPanel({
   onSelectHighway,
   onSelectPoint,
 }) {
-  const visibleHighways = flyoverMarkers.filter((f) => visibleFlyoverIds.has(f.id));
+  const visibleHighways = flyoverMarkers.filter((f) =>
+    visibleFlyoverIds.has(f.id),
+  );
 
   if (selectedPoint) {
     const displayName = formatPointName(selectedPoint.name);
@@ -22,7 +24,9 @@ export default function FlyoverDetailsPanel({
               className="w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{ background: selectedHighway?.color || "#8f1b8b" }}
             />
-            <h3 className="text-sm font-bold text-gray-900 truncate">{displayName}</h3>
+            <h3 className="text-sm font-bold text-gray-900 truncate">
+              {displayName}
+            </h3>
           </div>
         </div>
         <div className="px-4 py-3">
@@ -96,7 +100,9 @@ export default function FlyoverDetailsPanel({
                       {formatPointName(p.name)}
                     </span>
                     {p.chainage && (
-                      <span className="text-[10px] text-gray-400 flex-shrink-0">{p.chainage}</span>
+                      <span className="text-[10px] text-gray-400 flex-shrink-0">
+                        {p.chainage}
+                      </span>
                     )}
                   </button>
                 ))}
@@ -111,7 +117,7 @@ export default function FlyoverDetailsPanel({
   return (
     <div className="p-4">
       <div className="flex items-center gap-2 mb-1">
-        <MapPin className="w-4 h-4 text-blue-400" />
+        <Waypoints className="w-4 h-4 text-blue-400" />
         <p className="text-sm font-bold text-gray-700">Flyovers</p>
       </div>
 
@@ -134,10 +140,6 @@ export default function FlyoverDetailsPanel({
                 className="w-full flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:border-gray-200 hover:bg-gray-50 text-left transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ background: f.color }}
-                  />
                   <span className="text-[12px] font-semibold text-gray-800 truncate">
                     {f.displayName}
                   </span>

@@ -21,11 +21,23 @@ import {
 // weather is still legible at a glance without recoloring the whole card.
 const CONDITIONS = {
   clear: { icon: Sun, accent: "#fdba55", glow: "rgba(253,186,85,0.35)" },
-  "partly cloudy": { icon: CloudSun, accent: "#63b3ed", glow: "rgba(99,179,237,0.3)" },
+  "partly cloudy": {
+    icon: CloudSun,
+    accent: "#63b3ed",
+    glow: "rgba(99,179,237,0.3)",
+  },
   cloudy: { icon: Cloud, accent: "#9aa5b1", glow: "rgba(154,165,177,0.25)" },
   rain: { icon: CloudRain, accent: "#4fa3d1", glow: "rgba(79,163,209,0.3)" },
-  drizzle: { icon: CloudDrizzle, accent: "#7ec8e3", glow: "rgba(126,200,227,0.28)" },
-  storm: { icon: CloudLightning, accent: "#b39ddb", glow: "rgba(179,157,219,0.35)" },
+  drizzle: {
+    icon: CloudDrizzle,
+    accent: "#7ec8e3",
+    glow: "rgba(126,200,227,0.28)",
+  },
+  storm: {
+    icon: CloudLightning,
+    accent: "#b39ddb",
+    glow: "rgba(179,157,219,0.35)",
+  },
   snow: { icon: CloudSnow, accent: "#d9ecfb", glow: "rgba(217,236,251,0.35)" },
 };
 
@@ -87,7 +99,6 @@ export default function WeatherPopupCard({ weather, loading }) {
             {weather.location}
           </p>
         </div>
-
       </div>
 
       {/* hero temperature */}
@@ -97,7 +108,9 @@ export default function WeatherPopupCard({ weather, loading }) {
             <span className="text-[56px] font-bold tracking-tight">
               {weather.temp}
             </span>
-            <span className="mt-1.5 text-2xl font-semibold text-white/50">°</span>
+            <span className="mt-1.5 text-2xl font-semibold text-white/50">
+              °
+            </span>
           </div>
           <p className="mt-1 text-sm font-medium text-white/70">
             {weather.condition}

@@ -124,28 +124,28 @@ export default function WeatherPanel({ weather: weatherProp, loading, hourStep =
       </div>
 
       {/* Hero — current conditions */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 mb-6 shrink-0">
+      <div className="relative overflow-hidden rounded-xl border border-gray-200 p-3 mb-6 shrink-0 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-[0_12px_28px_-8px_rgba(37,99,235,0.35)]">
         <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10 blur-md pointer-events-none" />
 
         <div className="flex items-start justify-between relative mb-3">
           <div>
-            <p className="text-[11px] text-white/80 mb-0.5">Current conditions</p>
+            <p className="text-[11px]  mb-0.5">Current conditions</p>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-white leading-none">{weather.temp}°</span>
-              <span className="text-sm text-white/70">C</span>
+              <span className="text-3xl font-bold leading-none">{weather.temp}°</span>
+              <span className="text-sm ">C</span>
             </div>
-            <div className="flex items-center gap-1 mt-1 text-xs text-white/90 bg-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full w-fit">
-              <HeroIcon size={12} className="text-white" />
+            <div className="flex items-center gap-1 mt-1 text-xs  bg-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full w-fit">
+              <HeroIcon size={12}  />
               <span className="font-medium">{weather.condition}</span>
             </div>
           </div>
 
           {weather.riskLevel && (
             <div className="flex flex-col items-end gap-0.5 bg-white/15 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-[9px] uppercase tracking-wide text-white/70">Risk</span>
+              <span className="text-[9px] uppercase tracking-wide ">Risk</span>
               <div className="flex items-center gap-1">
-                <ShieldAlert size={12} className="text-white" />
-                <span className="text-[13px] font-bold text-white">{weather.riskLevel}</span>
+                <ShieldAlert  />
+                <span className="text-[13px] font-bold ">{weather.riskLevel}</span>
               </div>
             </div>
           )}
@@ -159,12 +159,12 @@ export default function WeatherPanel({ weather: weatherProp, loading, hourStep =
             { icon: Eye, label: "Visibility", value: weather.visibility, unit: "km" },
           ].map(({ icon: Icon, label, value, unit }) => (
             <div key={label} className="flex flex-col gap-0.5 bg-white/10 rounded-lg px-2 py-1.5 min-w-0">
-              <span className="text-[9px] text-white/70 uppercase tracking-wide truncate">{label}</span>
+              <span className="text-[9px]  uppercase tracking-wide truncate">{label}</span>
               <div className="flex items-center gap-1 min-w-0">
-                <Icon size={16} className="text-white shrink-0" />
-                <span className="text-[13px] font-bold text-white truncate">
+                <Icon size={16} className=" shrink-0" />
+                <span className="text-[13px] font-bold  truncate">
                   {value}
-                  <span className="text-white/70 font-medium">{unit}</span>
+                  <span className=" font-medium">{unit}</span>
                 </span>
               </div>
             </div>

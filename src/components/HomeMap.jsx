@@ -6,7 +6,6 @@ import {
   Marker,
   useMap,
   useMapEvents,
-  LayersControl,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -20,8 +19,9 @@ import {
   Check,
   Layers,
   Calendar,
+  TrafficCone,
 } from "lucide-react";
-import proj4 from 'proj4';
+import proj4 from "proj4";
 
 import { loadFlyoverData } from "../utils/geoJsonParser";
 import { useWeather } from "../hooks/useWeather";
@@ -31,6 +31,7 @@ import FlyoverDropdown from "./map/FlyoverDropdown";
 import IdwLayerDropdown from "./map/IdwLayerDropdown";
 import FlyoverDetailsPanel from "./map/FlyoverDetailsPanel";
 import FlyoverMarkers from "./map/FlyoverMarkers";
+import BaseLayerSwitcher, { BASE_LAYERS } from "./map/BaseLayerSwitcher";
 import { createIDWLayer } from "./IDWLeafletLayer";
 import { fetchIDWWeatherData } from "../services/api";
 import {
@@ -40,7 +41,7 @@ import {
   getFlyoverColor,
   getFlyoverDisplayName,
 } from "./map/mapHelpers";
-import StatsOverview from "./StatsOverview";  // four card in dashboard right side
+import StatsOverview from "./StatsOverview";
 
 import GoogleMapComponent from "./GoogleMapTraffic";
 
@@ -48,24 +49,26 @@ const REGION_CENTER = [30.30031525674896, 76.75438508247828];
 const REGION_ZOOM = 11;
 const DETAIL_LABEL_ZOOM = 16;
 
-// ============================================================
-// UTM to WGS84 Conversion Helper
-// ============================================================
-const UTM43N = '+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs';
-const WGS84 = 'EPSG:4326';
+const UTM43N = "+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs";
+const WGS84 = "EPSG:4326";
 
 function convertBufferToWGS84(geojson) {
   if (!geojson || !geojson.features) return geojson;
 
   const convertCoords = (coords) => {
-    if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+    if (
+      Array.isArray(coords) &&
+      coords.length === 2 &&
+      typeof coords[0] === "number" &&
+      typeof coords[1] === "number"
+    ) {
       if (coords[0] > 1000 || coords[1] > 1000) {
         try {
           const [x, y] = coords;
           const [lng, lat] = proj4(UTM43N, WGS84, [x, y]);
           return [lng, lat];
         } catch (e) {
-          console.warn('Failed to convert coordinate:', coords, e);
+          console.warn("Failed to convert coordinate:", coords, e);
           return coords;
         }
       }
@@ -76,13 +79,13 @@ function convertBufferToWGS84(geojson) {
 
   return {
     ...geojson,
-    features: geojson.features.map(f => ({
+    features: geojson.features.map((f) => ({
       ...f,
       geometry: {
         ...f.geometry,
-        coordinates: convertCoords(f.geometry.coordinates)
-      }
-    }))
+        coordinates: convertCoords(f.geometry.coordinates),
+      },
+    })),
   };
 }
 
@@ -245,13 +248,7 @@ function StatChip({ label, value }) {
   );
 }
 
-// ============================================================
-// MAIN HOMEMAP COMPONENT
-// ============================================================
 export default function HomeMap() {
-  // ============================================================
-  // 1. ALL STATE DECLARATIONS
-  // ============================================================
   const [flyoversList, setFlyoversList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState("Initializing map...");
@@ -262,8 +259,8 @@ export default function HomeMap() {
   const [currentZoom, setCurrentZoom] = useState(REGION_ZOOM);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTrafficMap, setShowTrafficMap] = useState(false);
+  const [baseLayer, setBaseLayer] = useState("streets");
 
-  // ===== IDW STATE =====
   const [idwLayer, setIdwLayer] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [weatherData, setWeatherData] = useState([]);
@@ -271,11 +268,9 @@ export default function HomeMap() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [idwLayerInstance, setIdwLayerInstance] = useState(null);
   const [bufferBoundary, setBufferBoundary] = useState(null);
-  // ================================
 
   const mapWrapperRef = useRef(null);
   const mapRef = useRef(null);
-
 
   const flyoverMarkers = useMemo(() => {
 
@@ -343,19 +338,13 @@ export default function HomeMap() {
     return { latlng: null, key: null };
   }, [selectedPoint, selectedHighway]);
 
-  // ============================================================
-  // 3. useWeather HOOK
-  // ============================================================
   const { weather, loading: weatherLoadingFromHook } =
     useWeather(weatherTarget);
   const isWeatherLoading = weatherLoading || weatherLoadingFromHook;
 
-  // ============================================================
-  // 4. IDW HANDLERS
-  // ============================================================
   const fetchWeatherData = useCallback(async (date) => {
     if (!date) {
-      setWeatherError('Please select a date');
+      setWeatherError("Please select a date");
       return;
     }
 
@@ -367,17 +356,12 @@ export default function HomeMap() {
       if (response && response.data) {
         setWeatherData(response.data);
         setSelectedDate(date);
-        console.log(
-          `✅ Weather data loaded for ${date}:`,
-          response.data.length,
-          "stations",
-        );
       } else {
         throw new Error("No data received from server");
       }
     } catch (err) {
       setWeatherError(err.message || "Failed to fetch weather data");
-      console.error(" Error fetching weather:", err);
+      console.error("Error fetching weather:", err);
     } finally {
       setWeatherLoading(false);
     }
@@ -406,15 +390,12 @@ export default function HomeMap() {
     [fetchWeatherData],
   );
 
-  // ============================================================
-  // 5. LOAD BUFFER BOUNDARY WITH AUTO-CONVERSION
-  // ============================================================
   useEffect(() => {
     let cancelled = false;
 
     const loadBufferBoundary = async () => {
       try {
-        const response = await fetch('/data/AOI_Buffer.geojson');
+        const response = await fetch("/data/AOI_Buffer.geojson");
         if (!response.ok) {
           console.warn(`Buffer.geojson request failed: ${response.status}`);
           return;
@@ -422,36 +403,37 @@ export default function HomeMap() {
         const data = await response.json();
 
         if (!cancelled) {
-          const isUTM = data.crs?.properties?.name?.includes('32643');
-          const isCRS84 = data.crs?.properties?.name?.includes('CRS84');
+          const isUTM = data.crs?.properties?.name?.includes("32643");
+          const isCRS84 = data.crs?.properties?.name?.includes("CRS84");
 
           let processedData = data;
 
           if (isUTM) {
-            console.log('🔄 Converting buffer from UTM (EPSG:32643) to WGS84...');
             processedData = convertBufferToWGS84(data);
-            console.log(' Buffer converted to WGS84 successfully');
           } else if (isCRS84) {
-            console.log('Buffer already in WGS84 (CRS84) format');
+            // already correct
           } else {
-            const firstCoord = data?.features?.[0]?.geometry?.coordinates?.[0]?.[0];
-            if (firstCoord && Array.isArray(firstCoord) && firstCoord.length === 2) {
+            const firstCoord =
+              data?.features?.[0]?.geometry?.coordinates?.[0]?.[0];
+            if (
+              firstCoord &&
+              Array.isArray(firstCoord) &&
+              firstCoord.length === 2
+            ) {
               const [x, y] = firstCoord;
               if (x > 1000 || y > 1000) {
-                console.log('Detected UTM coordinates, converting to WGS84...');
                 processedData = convertBufferToWGS84(data);
-                console.log('Buffer converted to WGS84 successfully');
-              } else {
-                console.log('Buffer already in WGS84 format');
               }
             }
           }
 
           setBufferBoundary(processedData);
-          console.log('Buffer boundary loaded for IDW clipping');
         }
       } catch (error) {
-        console.warn('Could not load Buffer.geojson, IDW will not be clipped:', error);
+        console.warn(
+          "Could not load Buffer.geojson, IDW will not be clipped:",
+          error,
+        );
       }
     };
 
@@ -461,9 +443,6 @@ export default function HomeMap() {
     };
   }, []);
 
-  // ============================================================
-  // 6. IDW LAYER INTEGRATION
-  // ============================================================
   useEffect(() => {
     if (idwLayerInstance && mapRef.current) {
       try {
@@ -491,28 +470,15 @@ export default function HomeMap() {
     if (!property) return;
 
     try {
-      console.log('Creating IDW layer with buffer:', {
-        property,
-        dataPoints: weatherData.length,
-        hasBuffer: !!bufferBoundary,
-        bufferType: bufferBoundary?.crs?.properties?.name || 'unknown'
-      });
-
       const newLayer = createIDWLayer(weatherData, property, {
         opacity: 0.85,
         zIndex: 100,
         clipPolygon: bufferBoundary,
-        cacheKey: `${selectedDate || 'latest'}::${property}`,
+        cacheKey: `${selectedDate || "latest"}::${property}`,
       });
 
       newLayer.addTo(mapRef.current);
       setIdwLayerInstance(newLayer);
-
-      console.log(`IDW layer added for ${idwLayer}:`, {
-        property: property,
-        dataPoints: weatherData.length,
-        clippedToBuffer: !!bufferBoundary,
-      });
     } catch (error) {
       console.error("Error creating IDW layer:", error);
       setWeatherError("Failed to render IDW layer");
@@ -528,18 +494,12 @@ export default function HomeMap() {
     };
   }, [idwLayer, weatherData, bufferBoundary, selectedDate]);
 
-  // ============================================================
-  // 7. INITIAL WEATHER LOAD
-  // ============================================================
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     setSelectedDate(today);
     fetchWeatherData(today);
   }, [fetchWeatherData]);
 
-  // ============================================================
-  // 8. FLYOVER DATA LOADING
-  // ============================================================
   const loadFlyovers = useCallback(async () => {
     try {
       const flyovers = await loadFlyoverData();
@@ -564,9 +524,6 @@ export default function HomeMap() {
     }
   }, []);
 
-  // ============================================================
-  // 9. EFFECTS
-  // ============================================================
   useEffect(() => {
     const loadBaseLayers = async () => {
       try {
@@ -608,9 +565,6 @@ export default function HomeMap() {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // ============================================================
-  // 10. CALLBACKS
-  // ============================================================
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       mapWrapperRef.current?.requestFullscreen?.();
@@ -657,12 +611,13 @@ export default function HomeMap() {
     setShowTrafficMap((prev) => !prev);
   }, []);
 
+  const activeBaseLayerUrl = BASE_LAYERS.find((l) => l.id === baseLayer)?.url;
+
   return (
     <div
       ref={mapWrapperRef}
       className="w-full min-h-[560px] h-full flex flex-col lg:flex-row gap-3 bg-transparent"
     >
-      {/* Column 1 — map */}
       <div className="relative flex-1 min-w-0 min-h-[400px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200">
         {overlayVisible && (
           <div
@@ -676,149 +631,210 @@ export default function HomeMap() {
           </div>
         )}
 
-        {/* Fullscreen Button - Hidden when Traffic Map is shown */}
+        {/* LEFT CONTROLS — only in Leaflet view, since traffic view's
+            spot there is occupied by GoogleMapComponent's own
+            "MAP TYPE" panel */}
         {!showTrafficMap && (
-          <div className="absolute top-3 left-3 z-[500] lg:top-33">
+          <div
+            className="
+              absolute
+              left-[11.1px]
+              top-[135px]
+              z-[1500]
+              flex
+              flex-col
+              gap-2
+              sm:top-[75px]
+            "
+          >
             <FullscreenButton
               isFullscreen={isFullscreen}
               onToggle={toggleFullscreen}
             />
+            <BaseLayerSwitcher
+              activeLayer={baseLayer}
+              onSelect={setBaseLayer}
+            />
           </div>
         )}
 
-        {/* TOP RIGHT CONTROLS - Mobile Responsive */}
-        <div className="absolute top-3 right-18 z-[500] flex flex-wrap items-center gap-1 sm:gap-2 max-w-[70%] sm:max-w-none">
-          {/* Traffic Toggle Button - Always visible */}
-          <button
-            onClick={handleToggleTrafficMap}
-            className={`
-              flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 
-              rounded-lg shadow-md 
-              transition-all duration-200 
-              text-[8px] sm:text-xs lg:text-sm font-[600]
-              ${showTrafficMap
-                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-white/95 text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }
-            `}
+        {/* TOP RIGHT CONTROLS - RESPONSIVE */}
+        <div
+          className="
+            absolute
+            top-2
+            left-1
+            right-1
+            z-[1500]
+            flex
+            flex-row
+            flex-nowrap
+            items-center
+            justify-end
+            gap-2
+            sm:top-3
+            sm:left-auto
+            sm:right-3
+            overflow-visible
+          "
+        >
+          {/* FULLSCREEN — only in traffic view, sits next to Exit */}
+          {showTrafficMap && (
+            <div className="shrink-0 isolate [zoom:0.57] sm:[zoom:1]">
+              <FullscreenButton
+                isFullscreen={isFullscreen}
+                onToggle={toggleFullscreen}
+              />
+            </div>
+          )}
+
+          {/* TRAFFIC / EXIT */}
+          <div
+            className="
+              shrink-0
+              isolate
+              [zoom:0.57]
+              sm:[zoom:1]
+            "
           >
+            <button
+              onClick={handleToggleTrafficMap}
+              className={`
+                flex items-center justify-center gap-1
+                px-2 py-1
+                rounded-lg
+                shadow-md
+                transition-all duration-200
+              text-[12px] font-semibold text-gray-700 hover:bg-gray-50
+                whitespace-nowrap
+                ${showTrafficMap
+                  ? "bg-blue-500 text-white hover:bg-blue-600"
+                  : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
+                }
+              `}
+            >
+              <TrafficCone className="w-4 h-4 shrink-0" />
+              <span>{showTrafficMap ? "Exit" : "Traffic"}</span>
+            </button>
+          </div>
 
-            <span>{showTrafficMap ? 'Exit' : 'Traffic'}</span>
-          </button>
-
-          {/* Leaflet-specific controls - Hidden when Traffic Map is shown */}
           {!showTrafficMap && (
             <>
-              <div className="hidden sm:block">
-                <FlyoverDropdown
-                  flyovers={flyoverMarkers}
-                  visibleIds={visibleFlyoverIds}
-                  onToggle={handleToggleFlyover}
-                  onToggleAll={handleToggleAllFlyovers}
-                />
+              <div
+                className="
+                  shrink-0
+                  [zoom:0.57]
+                  sm:[zoom:1]
+                "
+              >
+                <div className="hidden sm:block">
+                  <FlyoverDropdown
+                    flyovers={flyoverMarkers}
+                    visibleIds={visibleFlyoverIds}
+                    onToggle={handleToggleFlyover}
+                    onToggleAll={handleToggleAllFlyovers}
+                  />
+                </div>
+                <div className="block sm:hidden">
+                  <FlyoverDropdown
+                    flyovers={flyoverMarkers}
+                    visibleIds={visibleFlyoverIds}
+                    onToggle={handleToggleFlyover}
+                    onToggleAll={handleToggleAllFlyovers}
+                    compact={true}
+                  />
+                </div>
               </div>
-              <div className="hidden md:block">
-                <IdwLayerDropdown
-                  selectedId={idwLayer}
-                  onSelect={handleIdwSelect}
-                  selectedDate={selectedDate}
-                  onDateChange={handleDateChange}
-                  isLoading={isWeatherLoading}
-                  dataCount={weatherData.length}
-                  error={weatherError}
-                />
-              </div>
-              {/* Mobile dropdowns - compact version */}
-              <div className="block sm:hidden">
-                <FlyoverDropdown
-                  flyovers={flyoverMarkers}
-                  visibleIds={visibleFlyoverIds}
-                  onToggle={handleToggleFlyover}
-                  onToggleAll={handleToggleAllFlyovers}
-                  compact={true}
-                />
-              </div>
-              <div className="block md:hidden">
-                <IdwLayerDropdown
-                  selectedId={idwLayer}
-                  onSelect={handleIdwSelect}
-                  selectedDate={selectedDate}
-                  onDateChange={handleDateChange}
-                  isLoading={isWeatherLoading}
-                  dataCount={weatherData.length}
-                  error={weatherError}
-                  compact={true}
-                />
+
+              <div
+                className="
+                  shrink-0
+                  [zoom:0.57]
+                  sm:[zoom:1]
+                "
+              >
+                <div className="hidden md:block">
+                  <IdwLayerDropdown
+                    selectedId={idwLayer}
+                    onSelect={handleIdwSelect}
+                    selectedDate={selectedDate}
+                    onDateChange={handleDateChange}
+                    isLoading={isWeatherLoading}
+                    dataCount={weatherData.length}
+                    error={weatherError}
+                  />
+                </div>
+                <div className="block md:hidden">
+                  <IdwLayerDropdown
+                    selectedId={idwLayer}
+                    onSelect={handleIdwSelect}
+                    selectedDate={selectedDate}
+                    onDateChange={handleDateChange}
+                    isLoading={isWeatherLoading}
+                    dataCount={weatherData.length}
+                    error={weatherError}
+                    compact={true}
+                  />
+                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Conditional rendering: Show Google Map or Leaflet Map */}
         {showTrafficMap ? (
           <div style={{ height: "100%", width: "100%" }}>
             <GoogleMapComponent />
           </div>
         ) : (
-          <MapContainer
-            ref={mapRef}
-            center={REGION_CENTER}
-            zoom={REGION_ZOOM}
-            scrollWheelZoom
-            zoomControl
-            attributionControl={false}
-            style={{ height: "100%", width: "100%" }}
-          >
-            <ZoomTracker onZoomChange={setCurrentZoom} />
-            <FullscreenFit data={fullscreenFitData} isFullscreen={isFullscreen} />
-            <FocusOnPoint
-              latlng={focusTarget.latlng}
-              triggerKey={focusTarget.key}
-              zoom={15}
-            />
+          <>
+            <MapContainer
+              ref={mapRef}
+              center={REGION_CENTER}
+              zoom={REGION_ZOOM}
+              scrollWheelZoom
+              zoomControl
+              attributionControl={false}
+              style={{ height: "100%", width: "100%" }}
+            >
+              <ZoomTracker onZoomChange={setCurrentZoom} />
 
-            <div className="compact-layer-control">
-              <LayersControl position="topleft">
-                <LayersControl.BaseLayer checked name="Streets">
-                  <TileLayer
-                    url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-                    subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                    maxZoom={20}
-                    attribution="&copy; Google"
-                  />
-                </LayersControl.BaseLayer>
+              <FullscreenFit
+                data={fullscreenFitData}
+                isFullscreen={isFullscreen}
+              />
 
-                <LayersControl.BaseLayer name="Satellite">
-                  <TileLayer
-                    url="https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-                    subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                    maxZoom={20}
-                    attribution="&copy; Google"
-                  />
-                </LayersControl.BaseLayer>
-              </LayersControl>
-            </div>
+              <TileLayer
+                key={baseLayer}
+                url={activeBaseLayerUrl}
+                subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                maxZoom={20}
+                attribution="&copy; Google"
+              />
 
-            <FlyoverMarkers
-              flyoverMarkers={flyoverMarkers}
-              visibleFlyoverIds={visibleFlyoverIds}
-              isDetailZoom={isDetailZoom}
-              isFullscreen={isFullscreen}
-              weather={weather}
-              weatherLoading={isWeatherLoading}
-              onSelectHighway={handleSelectHighway}
-              onSelectPoint={handleSelectPoint}
-            />
-          </MapContainer>
+              <FocusOnPoint
+                latlng={focusTarget.latlng}
+                triggerKey={focusTarget.key}
+                zoom={15}
+              />
+
+              <FlyoverMarkers
+                flyoverMarkers={flyoverMarkers}
+                visibleFlyoverIds={visibleFlyoverIds}
+                isDetailZoom={isDetailZoom}
+                isFullscreen={isFullscreen}
+                weather={weather}
+                weatherLoading={isWeatherLoading}
+                onSelectHighway={handleSelectHighway}
+                onSelectPoint={handleSelectPoint}
+              />
+            </MapContainer>
+          </>
         )}
       </div>
 
-      {/* Column 2 — fixed width - Hidden on mobile */}
       {!isFullscreen && !showTrafficMap && (
-        <div className="hidden lg:block w-full lg:w-[380px] shrink-0">
+        <div className=" w-full lg:w-[380px] shrink-0">
           <div className="w-full h-full flex flex-col gap-3">
-            {/* <StatsOverview /> */}
-
             <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
               <div className="flex-1 overflow-y-auto">
                 <FlyoverDetailsPanel

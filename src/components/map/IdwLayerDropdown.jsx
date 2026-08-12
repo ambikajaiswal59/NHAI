@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Layers, Calendar } from "lucide-react";
+import { ChevronDown, CloudSun, Calendar } from "lucide-react";
 
 const IDW_LAYER_OPTIONS = [
   { id: "temperature", label: "Temperature" },
@@ -49,9 +49,9 @@ export default function IdwLayerDropdown({
       <div className="relative">
         <button
           onClick={() => setDatePickerOpen(!datePickerOpen)}
-          className="flex items-center gap-1.5 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-2.5 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-1.5 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-2.5 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
         >
-          <Calendar className="w-3.5 h-3.5 text-gray-500" />
+          <Calendar className="w-3.5 h-3.5 text-blue-500" />
           <span className="min-w-[70px]">{formatDisplayDate(selectedDate)}</span>
           <ChevronDown className="w-3 h-3 text-gray-400" />
         </button>
@@ -87,9 +87,9 @@ export default function IdwLayerDropdown({
       <div className="relative">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-2 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-3 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-2 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-3 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
         >
-          <Layers className="w-3.5 h-3.5 text-blue-500" />
+          <CloudSun className="w-3.5 h-3.5 text-blue-500" />
           {selectedLabel}
           <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
         </button>
