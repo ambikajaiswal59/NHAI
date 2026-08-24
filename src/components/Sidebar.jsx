@@ -21,7 +21,7 @@ import { ROUTES } from "../router/routes";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.HOME },
   { label: "Flyovers", icon: Waypoints, id: ROUTES.DASHBOARD },
-  { label: "Topography", icon: Mountain, id: ROUTES.TERRAIN },
+  { label: "Topography", icon: Mountain, id: ROUTES.Topography },
   { label: "Traffic", icon: TrafficCone, id: ROUTES.TRAFFIC },
   { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },

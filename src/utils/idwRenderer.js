@@ -1,10 +1,8 @@
-
 import L from 'leaflet';
 
 /**
  * IDW interpolation matching ol-ext behavior with 'count' weight
  * Uses ALL points with distance weighting (no search radius limitation)
- * This matches exactly what ol-ext does internally
  */
 function idwInterpolate(points, targetX, targetY, power = 2) {
     let numerator = 0;
@@ -18,9 +16,7 @@ function idwInterpolate(points, targetX, targetY, power = 2) {
         // Standard IDW weight (like ol-ext)
         const weight = 1 / Math.pow(dist, power);
 
-        // IMPORTANT: Multiply by 'count' value (like ol-ext's weight: 'count')
-        // In ol-ext, 'count' is the weight factor
-        // Your Angular code passes count as the weight
+        // Multiply by 'count' value for additional weighting
         const countWeight = point.count || 1;
 
         numerator += weight * point.value * countWeight;
@@ -70,141 +66,144 @@ function getColor(value) {
     ];
 }
 
+// Yield to the browser every N rows so a cache-miss render never blocks
+// the main thread for one long stretch. This is what removes the
+// "freeze then snap" feeling on the first render of a given month.
+const ROWS_PER_CHUNK = 40;
+
+function nextFrame() {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 /**
- * Main IDW Renderer - Matching Angular/ol-ext behavior
+ * Main IDW Renderer - For Monthly Aggregated Data
+ * Handles data with fields: rain_precip, avg_temp, wind
  */
-export function renderIDWToCanvas(data, property, bounds, width, height) {
-    return new Promise((resolve, reject) => {
-        if (!data || data.length === 0) {
-            reject(new Error('No data provided'));
-            return;
-        }
+export async function renderIDWToCanvas(data, property, bounds, width, height) {
+    if (!data || data.length === 0) {
+        throw new Error('No data provided');
+    }
 
-        try {
-            console.time('IDW Render');
-            console.log(`🎨 Starting IDW: ${width}x${height}, ${data.length} stations`);
+    console.time('IDW Render');
+    console.log(`🎨 Starting IDW: ${width}x${height}, ${data.length} stations`);
+    console.log(`📊 Property: ${property}`);
 
-            // Convert points to projected coordinates with COUNT
-            // count = normalized value (0-100) like in Angular
-            let minVal = Infinity;
-            let maxVal = -Infinity;
+    // First pass: calculate min/max for the selected property
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    let validDataCount = 0;
 
-            // First pass: calculate min/max
-            data.forEach(item => {
-                const value = parseFloat(item[property]);
-                if (!Number.isNaN(value)) {
-                    if (value < minVal) minVal = value;
-                    if (value > maxVal) maxVal = value;
-                }
-            });
-            const range = maxVal - minVal || 1;
-
-            // Second pass: create points with count (like Angular)
-            const points = data
-                .map(item => {
-                    const value = parseFloat(item[property]);
-                    if (Number.isNaN(value) || value === null) return null;
-
-                    const coord = L.CRS.EPSG3857.project(
-                        L.latLng(item.latitude, item.longitude)
-                    );
-
-                    // Calculate count like Angular does
-                    // count = percentage of max value (0-100)
-                    const normalized = (value - minVal) / range;
-                    const count = Math.max(1, Math.round(normalized * 100));
-
-                    return {
-                        x: coord.x,
-                        y: coord.y,
-                        value: value,
-                        count: count, // ← This matches Angular's 'count'
-                        lat: item.latitude,
-                        lng: item.longitude
-                    };
-                })
-                .filter(Boolean);
-
-            if (points.length < 3) {
-                reject(new Error(`Not enough points: ${points.length}`));
-                return;
-            }
-
-            // Get map bounds
-            const sw = L.CRS.EPSG3857.project(L.latLng(bounds.minLat, bounds.minLng));
-            const ne = L.CRS.EPSG3857.project(L.latLng(bounds.maxLat, bounds.maxLng));
-
-            const minX = sw.x;
-            const maxX = ne.x;
-            const minY = sw.y;
-            const maxY = ne.y;
-
-            // Calculate map dimensions
-            const mapWidth = maxX - minX;
-            const mapHeight = maxY - minY;
-
-            console.log(`📊 Range: ${minVal.toFixed(2)} to ${maxVal.toFixed(2)}`);
-            console.log(`📍 Map size: ${(mapWidth / 1000).toFixed(0)}km x ${(mapHeight / 1000).toFixed(0)}km`);
-
-            // Create canvas with HIGH quality
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-
-            // Use power=2 like ol-ext default
-            const gridSize = 1; // Full resolution
-            const power = 2.0; // Standard IDW power (matches ol-ext)
-
-            const imageData = ctx.createImageData(width, height);
-            const dataArray = imageData.data;
-
-            const scaleX = (maxX - minX) / width;
-            const scaleY = (maxY - minY) / height;
-
-            let pixelsRendered = 0;
-
-            // Render each pixel - using ALL points (no search radius)
-            // This matches ol-ext's behavior exactly
-            for (let py = 0; py < height; py += gridSize) {
-                for (let px = 0; px < width; px += gridSize) {
-                    const x = minX + px * scaleX;
-                    const y = minY + py * scaleY;
-
-                    // Skip outside bounds
-                    if (x < minX || x > maxX || y < minY || y > maxY) {
-                        continue;
-                    }
-
-                    // Interpolate using ALL points (like ol-ext)
-                    const value = idwInterpolate(points, x, y, power);
-                    const normalized = Math.max(0, Math.min(1, (value - minVal) / range));
-                    const [r, g, b] = getColor(normalized);
-
-                    const idx = (py * width + px) * 4;
-                    if (idx < dataArray.length) {
-                        dataArray[idx] = r;
-                        dataArray[idx + 1] = g;
-                        dataArray[idx + 2] = b;
-                        dataArray[idx + 3] = 255; // FULL OPAQUE
-                    }
-                    pixelsRendered++;
-                }
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-
-            console.log(`✅ Rendered ${pixelsRendered} pixels`);
-            console.timeEnd('IDW Render');
-            resolve(canvas);
-
-        } catch (error) {
-            console.error('❌ IDW Error:', error);
-            reject(error);
+    data.forEach(item => {
+        const value = parseFloat(item[property]);
+        if (!Number.isNaN(value) && value !== null && value !== undefined) {
+            if (value < minVal) minVal = value;
+            if (value > maxVal) maxVal = value;
+            validDataCount++;
         }
     });
+
+    if (validDataCount === 0) {
+        throw new Error('No valid data points found');
+    }
+
+    const range = maxVal - minVal || 1;
+    console.log(`📊 Data Range: ${minVal.toFixed(2)} to ${maxVal.toFixed(2)} (${validDataCount} valid points)`);
+
+    // Second pass: create points with optimized weighting for monthly data
+    const points = data
+        .map(item => {
+            const value = parseFloat(item[property]);
+            if (Number.isNaN(value) || value === null || value === undefined) return null;
+
+            // Convert lat/lng to Web Mercator projection
+            const coord = L.CRS.EPSG3857.project(
+                L.latLng(item.latitude, item.longitude)
+            );
+
+            // Calculate count weight (0-100) based on value range
+            const normalized = (value - minVal) / range;
+            const count = Math.max(1, Math.round(normalized * 100));
+
+            return {
+                x: coord.x,
+                y: coord.y,
+                value: value,
+                count: count,
+                lat: item.latitude,
+                lng: item.longitude
+            };
+        })
+        .filter(Boolean);
+
+    if (points.length < 3) {
+        throw new Error(`Not enough valid points: ${points.length} (need at least 3)`);
+    }
+
+    console.log(`📍 Using ${points.length} points for interpolation`);
+
+    // Get map bounds in projected coordinates
+    const sw = L.CRS.EPSG3857.project(L.latLng(bounds.minLat, bounds.minLng));
+    const ne = L.CRS.EPSG3857.project(L.latLng(bounds.maxLat, bounds.maxLng));
+
+    const minX = sw.x;
+    const maxX = ne.x;
+    const minY = sw.y;
+    const maxY = ne.y;
+
+    console.log(`📍 Map size: ${((maxX - minX) / 1000).toFixed(0)}km x ${((maxY - minY) / 1000).toFixed(0)}km`);
+
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    const power = 2.0; // Standard IDW power
+    const imageData = ctx.createImageData(width, height);
+    const dataArray = imageData.data;
+
+    const scaleX = (maxX - minX) / width;
+    const scaleY = (maxY - minY) / height;
+
+    let pixelsRendered = 0;
+
+    // Render each pixel, yielding to the browser periodically so this
+    // never shows up as a single long blocking task.
+    for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+            const x = minX + px * scaleX;
+            const y = minY + py * scaleY;
+
+            if (x < minX || x > maxX || y < minY || y > maxY) {
+                continue;
+            }
+
+            const value = idwInterpolate(points, x, y, power);
+            const normalized = Math.max(0, Math.min(1, (value - minVal) / range));
+            const [r, g, b] = getColor(normalized);
+
+            const idx = (py * width + px) * 4;
+            if (idx < dataArray.length) {
+                dataArray[idx] = r;
+                dataArray[idx + 1] = g;
+                dataArray[idx + 2] = b;
+                dataArray[idx + 3] = 255; // FULL OPAQUE
+            }
+            pixelsRendered++;
+        }
+
+        if (py % ROWS_PER_CHUNK === 0) {
+            await nextFrame();
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    console.log(`✅ Rendered ${pixelsRendered} pixels`);
+    console.timeEnd('IDW Render');
+    return canvas;
 }
 
 export { getColor };

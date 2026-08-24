@@ -1,11 +1,11 @@
-// src/components/Terrain.jsx
+// src/components/Topography.jsx
 import { useState, useEffect } from "react";
 import {
-    Layers,
+    Map,
     Droplets,
-    Shield,
+    Waves,
     Mountain,
-    AlertTriangle,
+    Zap,
     ChevronDown
 } from "lucide-react";
 import LandUseLandCover from "./LandUseLandCover";
@@ -16,7 +16,7 @@ const NAV_ITEMS = [
     {
         id: 'lulc',
         label: 'Land Use',
-        icon: Layers,
+        icon: Map,
         color: '#3b82f6',
         bg: 'bg-blue-50',
         activeBg: 'bg-blue-100',
@@ -38,7 +38,7 @@ const NAV_ITEMS = [
     {
         id: 'Flood',
         label: 'Flood',
-        icon: Shield,
+        icon: Waves,
         color: '#8b5cf6',
         bg: 'bg-purple-50',
         activeBg: 'bg-purple-100',
@@ -60,7 +60,7 @@ const NAV_ITEMS = [
     {
         id: 'Lightening',
         label: 'Lightening',
-        icon: AlertTriangle,
+        icon: Zap,           // ✅ Changed from AlertTriangle
         color: '#ef4444',
         bg: 'bg-red-50',
         activeBg: 'bg-red-100',
@@ -94,20 +94,34 @@ function renderPanel(tabId) {
         case 'elevation':
             return <ComingSoon key="elevation-panel" icon={Mountain} label="Elevation Map" colorClass="text-amber-600" />;
         case 'Lightening':
-            return <ComingSoon key="lightening-panel" icon={AlertTriangle} label="Lightening Map" colorClass="text-red-600" />;
+            return <ComingSoon key="lightening-panel" icon={Zap} label="Lightening Map" colorClass="text-red-600" />;
         default:
             return null;
     }
 }
 
-export default function Terrain({ className = "" }) {
+export default function Topography({ className = "" }) {
     const [activeTab, setActiveTab] = useState('lulc');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [remountKey, setRemountKey] = useState(Date.now());
 
+    const [isMobile, setIsMobile] = useState(
+        () => !window.matchMedia("(min-width: 768px)").matches
+    );
+
+
+    // Track mobile breakpoint
     useEffect(() => {
-        console.log("🗺️ Terrain mounted");
-        return () => console.log("🗺️ Terrain unmounting");
+        const mql = window.matchMedia("(min-width: 768px)");
+        const handleChange = (e) => setIsMobile(!e.matches);
+        handleChange(mql);
+        if (mql.addEventListener) {
+            mql.addEventListener("change", handleChange);
+            return () => mql.removeEventListener("change", handleChange);
+        } else {
+            mql.addListener(handleChange);
+            return () => mql.removeListener(handleChange);
+        }
     }, []);
 
     const activeItem = NAV_ITEMS.find(item => item.id === activeTab);
@@ -116,15 +130,17 @@ export default function Terrain({ className = "" }) {
 
     const handleTabChange = (tabId) => {
         if (tabId === activeTab) return;
-        console.log(`🔄 Switching from ${activeTab} to ${tabId}`);
+        // console.log(`Switching from ${activeTab} to ${tabId}`);
         setRemountKey(Date.now());
         setActiveTab(tabId);
+        setIsDropdownOpen(false);
     };
 
     return (
-        <div className={`flex flex-col h-full ${className}`}>
-            {/* Navigation */}
-            <div className="w-full bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200 p-1 mb-2">
+        <div className={`flex flex-col h-full w-full ${className}`}>
+            {/* Navigation - Fixed at top */}
+            {/* <div className="w-full bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200 p-1 mt-3 mb-2 flex-shrink-0"> */}
+            <div className="relative z-[2000] w-full bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200 p-1 mt-0 md:mt-3 lg:mt-0 mb-2 flex-shrink-0 overflow-visible">                {/* Desktop: Grid View */}
                 <div className="hidden md:grid grid-cols-5 gap-0.5">
                     {NAV_ITEMS.map((item) => {
                         const ItemIcon = item.icon;
@@ -153,21 +169,30 @@ export default function Terrain({ className = "" }) {
                     })}
                 </div>
 
-                {/* Mobile Dropdown */}
+                {/* ✅ FIXED: Mobile Dropdown - All options visible when open */}
                 <div className="md:hidden relative">
+                    {/* Dropdown Trigger Button */}
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="w-full flex items-center justify-between px-3 py-1.5 bg-white rounded-md border border-gray-200 hover:border-gray-300 transition-all"
+                        className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all shadow-sm"
                     >
-                        <div className="flex items-center gap-2">
-                            {Icon && <Icon size={16} style={{ color }} />}
-                            <span className="text-xs font-semibold text-gray-700">{activeItem?.label}</span>
+                        <div className="flex items-center gap-3">
+                            {Icon && <Icon size={20} style={{ color }} />}
+                            <span className="text-base font-semibold text-gray-800">{activeItem?.label}</span>
                         </div>
-                        <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown size={20} className={`text-gray-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
+                    {/* ✅ Dropdown Menu - All options visible */}
                     {isDropdownOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50">
+                        <div
+                            // className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999]"
+                            className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-[10001]"
+                            style={{
+                                maxHeight: "350px",
+                                overflowY: "auto",
+                            }}
+                        >
                             {NAV_ITEMS.map((item) => {
                                 const ItemIcon = item.icon;
                                 const isActive = activeTab === item.id;
@@ -180,17 +205,23 @@ export default function Terrain({ className = "" }) {
                                             setIsDropdownOpen(false);
                                         }}
                                         className={`
-                                            w-full flex items-center gap-2 px-3 py-2 text-xs transition-all
+                                            w-full flex items-center gap-3 px-4 py-3.5 text-base transition-all
                                             ${isActive
                                                 ? `${item.bg} ${item.text}`
                                                 : 'text-gray-600 hover:bg-gray-50'
                                             }
                                         `}
+                                        style={{
+                                            borderLeft: isActive ? `4px solid ${item.color}` : '4px solid transparent',
+                                        }}
                                     >
-                                        <ItemIcon size={14} />
+                                        <ItemIcon size={20} style={{ color: isActive ? item.color : '#6b7280' }} />
                                         <span className="font-medium">{item.label}</span>
                                         {isActive && (
-                                            <span className={`ml-auto w-1.5 h-1.5 rounded-full ${item.dot}`} />
+                                            <span
+                                                className="ml-auto w-2.5 h-2.5 rounded-full"
+                                                style={{ backgroundColor: item.color }}
+                                            />
                                         )}
                                     </button>
                                 );
@@ -200,8 +231,14 @@ export default function Terrain({ className = "" }) {
                 </div>
             </div>
 
-            {/* ✅ ONLY the active tab is rendered - Inactive tabs are UNMOUNTED */}
-            <div className="flex-1 min-h-0 relative">
+            {/* Map Container - Takes remaining space */}
+            <div
+                className="flex-1 min-h-0 relative"
+                style={{
+                    height: isMobile ? "calc(100vh - 200px)" : "100%",
+                    minHeight: isMobile ? "400px" : "auto",
+                }}
+            >
                 {renderPanel(activeTab)}
             </div>
         </div>

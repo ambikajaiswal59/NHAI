@@ -1,4 +1,3 @@
-// src/components/IDWLeafletLayer.js
 import L from 'leaflet';
 import { renderIDWToCanvas } from '../utils/idwRenderer';
 
@@ -20,22 +19,19 @@ function idwCacheSet(key, entry) {
     if (IDW_RENDER_CACHE.has(key)) {
         IDW_RENDER_CACHE.delete(key);
     } else if (IDW_RENDER_CACHE.size >= IDW_CACHE_MAX_ENTRIES) {
-        // Evict the least-recently-used entry (first key in the Map)
         const oldestKey = IDW_RENDER_CACHE.keys().next().value;
         IDW_RENDER_CACHE.delete(oldestKey);
     }
     IDW_RENDER_CACHE.set(key, entry);
 }
 
-
 export function clearIDWRenderCache() {
     IDW_RENDER_CACHE.clear();
 }
 
-
 const IDW_RASTER_LONG_EDGE = 900;
 const IDW_BOUNDS_PADDING_RATIO = 0.08;
-
+const DEFAULT_TRANSITION_MS = 350;
 
 export const IDWLeafletLayer = L.Layer.extend({
     initialize: function (data, property, options = {}) {
@@ -45,17 +41,18 @@ export const IDWLeafletLayer = L.Layer.extend({
         this._opacity = options.opacity || 0.7;
         this._zIndex = options.zIndex || 1000;
         this._clipPolygon = options.clipPolygon || null;
+        this._transitionMs = options.transitionMs ?? DEFAULT_TRANSITION_MS;
 
         this._cacheKey = options.cacheKey || null;
         this._imageOverlay = null;
         this._isRendering = false;
-        this._pendingRerender = false; // true if setData/setClipPolygon arrived mid-render
+        this._pendingRerender = false;
         this._initTimeout = null;
+        this._pendingCleanupTimeout = null;
     },
 
     onAdd: function (map) {
         this._map = map;
-
 
         this._initTimeout = setTimeout(() => {
             this._initTimeout = null;
@@ -74,7 +71,32 @@ export const IDWLeafletLayer = L.Layer.extend({
             this._initTimeout = null;
         }
 
+        if (this._pendingCleanupTimeout) {
+            clearTimeout(this._pendingCleanupTimeout);
+            this._pendingCleanupTimeout = null;
+        }
+
         this._map = null;
+    },
+
+    /**
+     * CRITICAL: Update the layer with new data WITHOUT removing/re-adding
+     * This is the key method for smooth month transitions
+     */
+    updateData: function (data, property, cacheKey) {
+        this._data = data || [];
+        this._property = property || this._property;
+        if (cacheKey !== undefined) this._cacheKey = cacheKey;
+
+        // If the layer is on the map, re-render in place
+        if (this._map) {
+            // Cancel any pending render
+            if (this._initTimeout) {
+                clearTimeout(this._initTimeout);
+                this._initTimeout = null;
+            }
+            this._render();
+        }
     },
 
     _computeRenderBounds: function () {
@@ -128,7 +150,6 @@ export const IDWLeafletLayer = L.Layer.extend({
             }
         }
 
-        // Last resort: current viewport (old behavior)
         if (this._map) {
             try {
                 const b = this._map.getBounds();
@@ -146,12 +167,9 @@ export const IDWLeafletLayer = L.Layer.extend({
         return null;
     },
 
-    /** Pixel resolution for the raster, aspect-matched to the render bounds. */
     _computeResolution: function (geoBounds) {
         const latRange = geoBounds.maxLat - geoBounds.minLat;
         const lngRange = geoBounds.maxLng - geoBounds.minLng;
-        // Rough correction so pixels aren't badly stretched at this
-        // latitude (longitude degrees are "shorter" than latitude degrees).
         const avgLatRad = ((geoBounds.minLat + geoBounds.maxLat) / 2) * (Math.PI / 180);
         const adjustedLngRange = lngRange * Math.cos(avgLatRad);
         const aspect = adjustedLngRange > 0 ? (latRange / adjustedLngRange) : 1;
@@ -167,7 +185,6 @@ export const IDWLeafletLayer = L.Layer.extend({
         return { width, height };
     },
 
-    /** Derive a stable cache key when the caller didn't pass one explicitly. */
     _deriveCacheKey: function () {
         if (this._cacheKey) return this._cacheKey;
         const n = this._data.length;
@@ -213,7 +230,7 @@ export const IDWLeafletLayer = L.Layer.extend({
 
             const canvas = await renderIDWToCanvas(this._data, this._property, geoBounds, width, height);
 
-            if (!this._map) return; // removed while awaiting
+            if (!this._map) return;
             if (!canvas) {
                 console.warn('Failed to render IDW canvas');
                 return;
@@ -251,28 +268,50 @@ export const IDWLeafletLayer = L.Layer.extend({
         }
     },
 
-    /** Swap in a new image overlay at the given fixed geographic bounds. */
+    /**
+     * Swap in a new image overlay with crossfade
+     * This prevents the blank frame jerk on month changes
+     */
     _applyOverlay: function (dataUrl, imageBounds) {
         if (!this._map) return;
 
-        if (this._imageOverlay) {
-            this._map.removeLayer(this._imageOverlay);
-            this._imageOverlay = null;
-        }
+        const prevOverlay = this._imageOverlay;
 
-        this._imageOverlay = L.imageOverlay(dataUrl, imageBounds, {
-            opacity: this._opacity,
+        const newOverlay = L.imageOverlay(dataUrl, imageBounds, {
+            opacity: prevOverlay ? 0 : this._opacity,
             zIndex: this._zIndex,
             interactive: false,
             className: 'idw-leaflet-overlay',
         });
 
-        this._imageOverlay.addTo(this._map);
+        newOverlay.addTo(this._map);
+        this._imageOverlay = newOverlay;
+
+        if (this._pendingCleanupTimeout) {
+            clearTimeout(this._pendingCleanupTimeout);
+            this._pendingCleanupTimeout = null;
+        }
+
+        if (!prevOverlay) return;
+
+        const imgEl = newOverlay.getElement();
+        if (imgEl) {
+            imgEl.style.transition = `opacity ${this._transitionMs}ms ease-out`;
+            void imgEl.offsetHeight;
+        }
+
+        requestAnimationFrame(() => {
+            newOverlay.setOpacity(this._opacity);
+        });
+
+        this._pendingCleanupTimeout = setTimeout(() => {
+            this._pendingCleanupTimeout = null;
+            if (this._map && prevOverlay !== this._imageOverlay) {
+                this._map.removeLayer(prevOverlay);
+            }
+        }, this._transitionMs + 50);
     },
 
-    /**
-     * Apply polygon clipping to the canvas
-     */
     _applyPolygonClip: function (canvas, boundsObj) {
         return new Promise((resolve) => {
             try {
@@ -284,8 +323,6 @@ export const IDWLeafletLayer = L.Layer.extend({
                     return;
                 }
 
-                // Get ALL polygon rings (every part of a MultiPolygon, every
-                // feature in a FeatureCollection) as pixel coordinates.
                 const polygonRings = this._getPolygonPixelRings(boundsObj, width, height);
 
                 if (!polygonRings || polygonRings.length === 0) {
@@ -293,13 +330,11 @@ export const IDWLeafletLayer = L.Layer.extend({
                     return;
                 }
 
-                // Create a temporary canvas for clipping
                 const clippedCanvas = document.createElement('canvas');
                 clippedCanvas.width = width;
                 clippedCanvas.height = height;
                 const ctx = clippedCanvas.getContext('2d');
 
-                // Draw the original IDW image
                 ctx.drawImage(canvas, 0, 0);
 
                 ctx.save();
@@ -316,7 +351,6 @@ export const IDWLeafletLayer = L.Layer.extend({
                     ctx.closePath();
                 });
 
-                // Clip using destination-in (nonzero winding unions all rings)
                 ctx.globalCompositeOperation = 'destination-in';
                 ctx.fill();
                 ctx.restore();
@@ -329,7 +363,6 @@ export const IDWLeafletLayer = L.Layer.extend({
         });
     },
 
-
     _lngLatToPixel: function ([lng, lat], boundsObj, canvasWidth, canvasHeight) {
         const { minLat, maxLat, minLng, maxLng } = boundsObj;
 
@@ -339,7 +372,6 @@ export const IDWLeafletLayer = L.Layer.extend({
 
         const x = ((lng - minLng) / (maxLng - minLng)) * canvasWidth;
         const y = ((maxLat - lat) / (maxLat - minLat)) * canvasHeight;
-
 
         return [x, y];
     },
@@ -370,12 +402,10 @@ export const IDWLeafletLayer = L.Layer.extend({
         }
     },
 
-
     _extractRings: function (input) {
         if (!input) return [];
 
         try {
-            // FeatureCollection — gather rings from every feature, not just the first
             if (input.type === 'FeatureCollection') {
                 return (input.features || []).flatMap((feature) =>
                     this._extractRings(feature.geometry)
@@ -391,18 +421,15 @@ export const IDWLeafletLayer = L.Layer.extend({
             }
 
             if (input.type === 'Polygon') {
-
                 return input.coordinates?.[0] ? [input.coordinates[0]] : [];
             }
 
             if (input.type === 'MultiPolygon') {
-                // Outer ring of EVERY polygon part, not just the first.
                 return (input.coordinates || [])
                     .map((polygon) => polygon?.[0])
                     .filter(Boolean);
             }
 
-            // Already a plain ring / array of [lng, lat] pairs
             if (Array.isArray(input)) {
                 return [input];
             }
@@ -430,7 +457,6 @@ export const IDWLeafletLayer = L.Layer.extend({
         }
     },
 
-    /** Explicitly set/replace the cache key (e.g. `${date}::${property}`). */
     setCacheKey: function (cacheKey) {
         this._cacheKey = cacheKey || null;
     },
@@ -461,12 +487,6 @@ export const IDWLeafletLayer = L.Layer.extend({
     }
 });
 
-/**
- * Helper function to create IDW layer
- */
 export function createIDWLayer(data, property, options = {}) {
     return new IDWLeafletLayer(data, property, options);
 }
-
-
-
