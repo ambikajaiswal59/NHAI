@@ -45,6 +45,8 @@ import {
 } from "./map/mapHelpers";
 import StatsOverview from "./StatsOverview";
 
+import IDWLegend from "./map/IDWLegend";
+
 import GoogleMapComponent from "./GoogleMapTraffic";
 
 const REGION_CENTER = [30.30031525674896, 76.75438508247828];
@@ -129,10 +131,9 @@ export default function HomeMap() {
   } = useIDWWeather();
 
   const [idwLayer, setIdwLayer] = useState(null);
-  // ✅ Use ref instead of state for layer instance - prevents re-renders
   const idwLayerRef = useRef(null);
   const [bufferBoundary, setBufferBoundary] = useState(null);
-  const [isIdwLayerLoading, setIsIdwLayerLoading] = useState(false);
+  const preRenderStartedRef = useRef(false); // ✅ Track if pre-rendering has started
 
   const mapWrapperRef = useRef(null);
   const mapRef = useRef(null);
@@ -206,24 +207,26 @@ export default function HomeMap() {
   const handleIdwSelect = useCallback(
     (layerId) => {
       setIdwLayer(layerId);
+
       if (layerId !== null) {
+        preRenderStartedRef.current = false;
         changeLayer(layerId);
       }
 
       if (layerId === null) {
-        // ✅ Use ref instead of state
         if (idwLayerRef.current && mapRef.current) {
           try {
             mapRef.current.removeLayer(idwLayerRef.current);
             idwLayerRef.current = null;
           } catch (e) { }
         }
-        setIsIdwLayerLoading(false);
+        preRenderStartedRef.current = false;
         clearData();
       }
     },
     [changeLayer, clearData],
   );
+
 
   // Load buffer boundary for clipping
   useEffect(() => {
@@ -279,17 +282,46 @@ export default function HomeMap() {
     };
   }, []);
 
-  // ✅ CRITICAL FIX: Create or UPDATE IDW layer when data changes
+  // ✅ UPDATED: Create or UPDATE IDW layer with pre-rendering trigger
+
   useEffect(() => {
-    // If no IDW layer selected OR no weather data, remove layer
-    if (!idwLayer || !weatherData || weatherData.length === 0 || !mapRef.current) {
+    // If no IDW layer selected, remove layer and return
+    if (!idwLayer) {
       if (idwLayerRef.current) {
         try {
-          mapRef.current.removeLayer(idwLayerRef.current);
+          mapRef.current?.removeLayer(idwLayerRef.current);
           idwLayerRef.current = null;
         } catch (e) { }
       }
-      setIsIdwLayerLoading(false);
+      preRenderStartedRef.current = false;
+      return;
+    }
+
+    // ✅ If weatherData is null but allMonthlyData exists, try to get data
+    let currentData = weatherData;
+    if (!currentData || currentData.length === 0) {
+      if (selectedMonth && allMonthlyData) {
+        currentData = allMonthlyData.filter(item =>
+          `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
+        );
+        // ✅ Update weatherData so it's available for future renders
+        if (currentData && currentData.length > 0) {
+          setWeatherData(currentData);
+        }
+      } else if (allMonthlyData && months.length > 0) {
+        const firstMonth = months[0];
+        currentData = allMonthlyData.filter(item =>
+          `${item.year}-${String(item.month).padStart(2, '0')}` === firstMonth
+        );
+        if (currentData && currentData.length > 0) {
+          setWeatherData(currentData);
+          setSelectedMonth(firstMonth);
+        }
+      }
+    }
+
+    // If still no data, return
+    if (!currentData || currentData.length === 0 || !mapRef.current) {
       return;
     }
 
@@ -299,61 +331,77 @@ export default function HomeMap() {
       wind: "wind",
     };
     const property = propertyMap[idwLayer];
+    if (!property) return;
 
-    if (!property) {
-      setIsIdwLayerLoading(false);
-      return;
-    }
-
-    // ✅ If layer exists, UPDATE it instead of recreating
+    // ✅ If layer exists, update it
     if (idwLayerRef.current) {
       console.log('🔄 Updating existing IDW layer for month:', selectedMonth);
-
       try {
         idwLayerRef.current.updateData(
-          weatherData,
+          currentData,
           property,
           `${selectedMonth || "latest"}::${property}`
         );
-        setIsIdwLayerLoading(false);
       } catch (error) {
         console.error("Error updating IDW layer:", error);
-        setIsIdwLayerLoading(false);
       }
-      return; // ✅ Exit early - no layer recreation!
+      return;
     }
 
-    // 🎯 Only runs ONCE - when creating the layer for the first time
-    console.log('🎨 Creating new IDW layer for the first time');
-    setIsIdwLayerLoading(true);
+    // ✅ CREATE NEW LAYER
+    console.log('🎨 Creating NEW IDW layer for:', idwLayer);
 
-    setTimeout(() => {
+    (async () => {
       try {
         const newLayer = createIDWLayer(
-          weatherData,
+          currentData,
           property,
           {
             opacity: 0.85,
             zIndex: 100,
             clipPolygon: bufferBoundary,
             cacheKey: `${selectedMonth || "latest"}::${property}`,
+            propertyMap: propertyMap,
           }
         );
 
-        newLayer.addTo(mapRef.current);
-        idwLayerRef.current = newLayer; // ✅ Store in ref
+        // ✅ Pre-render current month first
+        console.log('⏳ Pre-rendering current month before adding to map...');
+        const currentMonthData = allMonthlyData?.filter(item =>
+          `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
+        ) || currentData;
 
-        setTimeout(() => {
-          setIsIdwLayerLoading(false);
-        }, 200);
+        await newLayer.preRenderAllMonths(
+          currentMonthData,
+          idwLayer,
+          propertyMap
+        );
+        console.log('✅ Current month pre-rendered — adding layer to map now');
+
+        // ✅ ADD LAYER TO MAP
+        if (!mapRef.current) return;
+        newLayer.addTo(mapRef.current);
+        idwLayerRef.current = newLayer;
+
+        // ✅ Pre-render remaining months in background
+        if (allMonthlyData?.length && !preRenderStartedRef.current) {
+          preRenderStartedRef.current = true;
+          console.log('🔥 Background pre-rendering ALL layers × ALL months...');
+
+          newLayer.preRenderAllLayers(
+            allMonthlyData,
+            ['temperature', 'rainfall', 'wind'],
+            propertyMap
+          ).catch(err => console.warn('Background pre-render failed:', err));
+        }
+
       } catch (error) {
         console.error("Error creating IDW layer:", error);
-        setIsIdwLayerLoading(false);
       }
-    }, 100);
+    })();
 
-    // ✅ Cleanup only on unmount
     return () => {
+      // Cleanup on unmount
       if (idwLayerRef.current && mapRef.current) {
         try {
           mapRef.current.removeLayer(idwLayerRef.current);
@@ -361,7 +409,9 @@ export default function HomeMap() {
         } catch (e) { }
       }
     };
-  }, [idwLayer, weatherData, bufferBoundary, selectedMonth]);
+  }, [idwLayer, weatherData, bufferBoundary, selectedMonth, allMonthlyData, months]);
+
+
 
   // Load initial monthly data
   useEffect(() => {
@@ -484,11 +534,12 @@ export default function HomeMap() {
   return (
     <div
       ref={mapWrapperRef}
-      className={`w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent ${showTrafficMap ? 'lg:flex-col' : 'lg:flex-row'
+      className={`w-full max-w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent overflow-x-hidden ${showTrafficMap ? 'lg:flex-col' : 'lg:flex-row'
         }`}
     >
-      <div className={`relative w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''
-        }`}>
+      {/* <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''
+        } ${idwLayer && months.length > 0 && !showTrafficMap ? 'pb-14' : ''}`}> */}
+      <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''}`}>
         {overlayVisible && (
           <div
             className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/70 backdrop-blur-sm transition-opacity duration-500"
@@ -497,25 +548,6 @@ export default function HomeMap() {
             <div className="flex flex-col items-center gap-3">
               <div className="h-8 w-8 rounded-full border-4 border-gray-300 border-t-[#81198c] animate-spin" />
               <p className="text-sm text-gray-700">{loadingStatus}</p>
-            </div>
-          </div>
-        )}
-
-        {/* IDW Layer Loading Overlay - Only over the map */}
-        {isIdwLayerLoading && !loading && (
-          <div
-            className="absolute inset-0 z-[900] flex items-center justify-center bg-white/60 backdrop-blur-sm"
-          >
-            <div className="flex flex-col items-center gap-3 bg-white/90 rounded-xl px-6 py-4 shadow-lg border border-gray-200">
-              <div className="h-8 w-8 rounded-full border-4 border-gray-300 border-t-[#81198c] animate-spin" />
-              <p className="text-sm font-medium text-gray-700">
-                Creating IDW Layer...
-              </p>
-              <p className="text-xs text-gray-500">
-                {idwLayer === 'temperature' && 'Interpolating temperature data'}
-                {idwLayer === 'rainfall' && 'Interpolating rainfall data'}
-                {idwLayer === 'wind' && 'Interpolating wind data'}
-              </p>
             </div>
           </div>
         )}
@@ -664,7 +696,7 @@ export default function HomeMap() {
                     selectedId={idwLayer}
                     onSelect={handleIdwSelect}
                     selectedMonth={selectedMonth}
-                    isLoading={isWeatherLoading || isIdwLayerLoading}
+                    isLoading={isWeatherLoading}
                     dataCount={weatherData?.length || 0}
                     error={idwError}
                     months={months}
@@ -682,7 +714,7 @@ export default function HomeMap() {
                     selectedId={idwLayer}
                     onSelect={handleIdwSelect}
                     selectedMonth={selectedMonth}
-                    isLoading={isWeatherLoading || isIdwLayerLoading}
+                    isLoading={isWeatherLoading}
                     dataCount={weatherData?.length || 0}
                     error={idwError}
                     months={months}
@@ -706,50 +738,62 @@ export default function HomeMap() {
             <GoogleMapComponent />
           </div>
         ) : (
-          <>
-            <MapContainer
-              ref={mapRef}
-              center={REGION_CENTER}
-              zoom={REGION_ZOOM}
-              minZoom={MIN_ZOOM}
-              maxZoom={MAX_ZOOM}
-              scrollWheelZoom
-              zoomControl
-              attributionControl={false}
-              style={{ height: "100%", width: "100%" }}
-            >
-              <ZoomTracker onZoomChange={setCurrentZoom} />
+          <MapContainer
+            ref={mapRef}
+            center={REGION_CENTER}
+            zoom={REGION_ZOOM}
+            minZoom={MIN_ZOOM}
+            maxZoom={MAX_ZOOM}
+            scrollWheelZoom
+            zoomControl
+            attributionControl={false}
+            style={{
+              height: "100%",
+              width: "100%",
+              flex: "1",
+              minWidth: "0"
+            }}
+          >
+            <ZoomTracker onZoomChange={setCurrentZoom} />
 
-              <FullscreenFit
-                data={fullscreenFitData}
-                isFullscreen={isFullscreen}
-              />
+            <FullscreenFit
+              data={fullscreenFitData}
+              isFullscreen={isFullscreen}
+            />
 
-              <TileLayer
-                key={baseLayer}
-                url={activeBaseLayerUrl}
-                subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                maxZoom={20}
-                attribution="&copy; Google"
-              />
+            <TileLayer
+              key={baseLayer}
+              url={activeBaseLayerUrl}
+              subdomains={["mt0", "mt1", "mt2", "mt3"]}
+              maxZoom={20}
+              attribution="&copy; Google"
+            />
 
-              <FocusOnPoint
-                latlng={focusTarget.latlng}
-                triggerKey={focusTarget.key}
-                zoom={15}
-              />
+            <FocusOnPoint
+              latlng={focusTarget.latlng}
+              triggerKey={focusTarget.key}
+              zoom={15}
+            />
 
-              <FlyoverMarkers
-                flyoverMarkers={flyoverMarkers}
-                visibleFlyoverIds={visibleFlyoverIds}
-                isDetailZoom={isDetailZoom}
-                isFullscreen={isFullscreen}
-                weather={weather}
-                weatherLoading={isWeatherLoading}
-                onSelectHighway={handleSelectHighway}
-                onSelectPoint={handleSelectPoint}
+            <FlyoverMarkers
+              flyoverMarkers={flyoverMarkers}
+              visibleFlyoverIds={visibleFlyoverIds}
+              isDetailZoom={isDetailZoom}
+              isFullscreen={isFullscreen}
+              weather={weather}
+              weatherLoading={isWeatherLoading}
+              onSelectHighway={handleSelectHighway}
+              onSelectPoint={handleSelectPoint}
+            />
+
+            {/* IDW Legend - Bottom Left */}
+            {idwLayer && weatherData && weatherData.length > 0 && (
+              <IDWLegend
+                data={weatherData}
+                property={idwLayer === 'temperature' ? 'avg_temp' :
+                  idwLayer === 'rainfall' ? 'rain_precip' : 'wind'}
               />
-            </MapContainer>
+            )}
 
             {/* Month Timeline Bar - Bottom Center */}
             {idwLayer && months.length > 0 && !showTrafficMap && (
@@ -763,12 +807,12 @@ export default function HomeMap() {
                 className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500]"
               />
             )}
-          </>
+          </MapContainer>
         )}
       </div>
 
       {!isFullscreen && !showTrafficMap && (
-        <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0">
+        <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0 flex-shrink-0">
           <div className="w-full h-full min-h-0 flex flex-col gap-3">
             <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
               <div className="flex-1 min-h-0 overflow-y-auto">
@@ -796,4 +840,5 @@ export default function HomeMap() {
 
     </div>
   );
+
 }

@@ -69,7 +69,7 @@ function getColor(value) {
 // Yield to the browser every N rows so a cache-miss render never blocks
 // the main thread for one long stretch. This is what removes the
 // "freeze then snap" feeling on the first render of a given month.
-const ROWS_PER_CHUNK = 40;
+const ROWS_PER_CHUNK = 20;
 
 function nextFrame() {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));

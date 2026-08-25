@@ -50,7 +50,25 @@ function LULCLegend() {
     );
 }
 
-function YearSelect({ label, value, onChange }) {
+// function YearSelect({ label, value, onChange }) {
+//     return (
+//         <div className="flex items-center gap-2">
+//             <label className="text-sm text-black-700 font-medium">{label}</label>
+//             <select
+//                 value={value}
+//                 onChange={(e) => onChange(Number(e.target.value))}
+//                 className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+//             >
+//                 {YEARS.map((y) => (
+//                     <option key={y} value={y}>{y}</option>
+//                 ))}
+//             </select>
+//         </div>
+//     );
+// }
+
+
+function YearSelect({ label, value, onChange, disabledYears = [] }) {
     return (
         <div className="flex items-center gap-2">
             <label className="text-sm text-black-700 font-medium">{label}</label>
@@ -59,13 +77,24 @@ function YearSelect({ label, value, onChange }) {
                 onChange={(e) => onChange(Number(e.target.value))}
                 className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-                {YEARS.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                ))}
+                {YEARS.map((y) => {
+                    const isDisabled = disabledYears.includes(y);
+                    return (
+                        <option
+                            key={y}
+                            value={y}
+                            disabled={isDisabled}
+                            className={isDisabled ? 'text-gray-400 bg-gray-100' : 'text-gray-900'}
+                        >
+                            {y} {isDisabled ? '' : ''}
+                        </option>
+                    );
+                })}
             </select>
         </div>
     );
 }
+
 
 function FullscreenButton({ isFullscreen, onToggle }) {
     return (
@@ -675,8 +704,8 @@ export default function LandUseLandCover({
                     </span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <YearSelect label="Left" value={yearLeft} onChange={setYearLeft} />
-                    <YearSelect label="Right" value={yearRight} onChange={setYearRight} />
+                    <YearSelect label="Left" value={yearLeft} onChange={setYearLeft} disabledYears={[yearRight]} />
+                    <YearSelect label="Right" value={yearRight} onChange={setYearRight} disabledYears={[yearLeft]} />
                 </div>
             </div>
 
