@@ -268,7 +268,7 @@ export default function TrafficAnalysisPanel({
                         fontSize: isMobile ? "10px" : "11px",
                         color: "#6b7280"
                     }}>
-                        Real-time Traffic Analysis
+                        Real-time Traffic Analysis Last 24 hours
                     </p>
                 </div>
 

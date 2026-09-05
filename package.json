@@ -18,6 +18,7 @@
     "leaflet": "^1.9.4",
     "leaflet-geoserver": "^0.0.1",
     "leaflet-geotiff": "^0.2.0",
+    "leaflet-rotate": "^0.2.8",
     "leaflet-side-by-side": "^2.2.0",
     "leaflet.gridlayer.googlemutant": "^0.16.0",
     "lucide-react": "^1.27.0",

@@ -1,1300 +1,2757 @@
-//HomeMap.jsx file
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import {
-    MapContainer,
-    TileLayer,
-    GeoJSON,
-    Marker,
-    useMap,
-    useMapEvents,
-} from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import {
-    MapPin,
-    X,
-    ChevronDown,
-    Waypoints,
-    Maximize,
-    Minimize,
-    Check,
-    Layers,
-    Calendar,
-    TrafficCone,
-} from "lucide-react";
-import proj4 from "proj4";
-
-import { loadFlyoverData } from "../utils/geoJsonParser";
-import { useWeather } from "../hooks/useWeather";
-import { useIDWWeather } from "../hooks/useIDWWeather";
-import WeatherPanel from "../components/WeatherPanel";
-import FullscreenButton from "./map/FullscreenButton";
-import FlyoverDropdown from "./map/FlyoverDropdown";
-import IdwLayerDropdown from "./map/IdwLayerDropdown";
-
-import FlyoverDetailsPanel from "./map/FlyoverDetailsPanel";
-import FlyoverMarkers from "./map/FlyoverMarkers";
-import BaseLayerSwitcher, { BASE_LAYERS } from "./map/BaseLayerSwitcher";
-import { createIDWLayer } from "./IDWLeafletLayer";
-import {
-    ZoomTracker,
-    FullscreenFit,
-    FocusOnPoint,
-    getFlyoverColor,
-    getFlyoverDisplayName,
-} from "./map/mapHelpers";
-import StatsOverview from "./StatsOverview";
-
-import GoogleMapComponent from "./GoogleMapTraffic";
-
-const REGION_CENTER = [30.30031525674896, 76.75438508247828];
-const REGION_ZOOM = 11;
-const MIN_ZOOM = 9;
-const MAX_ZOOM = 17;
-const POPUP_ZOOM_THRESHOLD = 16;
-
-const UTM43N = "+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs";
-const WGS84 = "EPSG:4326";
-
-function convertBufferToWGS84(geojson) {
-    if (!geojson || !geojson.features) return geojson;
-
-    const convertCoords = (coords) => {
-        if (
-            Array.isArray(coords) &&
-            coords.length === 2 &&
-            typeof coords[0] === "number" &&
-            typeof coords[1] === "number"
-        ) {
-            if (coords[0] > 1000 || coords[1] > 1000) {
-                try {
-                    const [x, y] = coords;
-                    const [lng, lat] = proj4(UTM43N, WGS84, [x, y]);
-                    return [lng, lat];
-                } catch (e) {
-                    console.warn("Failed to convert coordinate:", coords, e);
-                    return coords;
-                }
-            }
-            return coords;
-        }
-        return coords.map(convertCoords);
-    };
-
-    return {
-        ...geojson,
-        features: geojson.features.map((f) => ({
-            ...f,
-            geometry: {
-                ...f.geometry,
-                coordinates: convertCoords(f.geometry.coordinates),
-            },
-        })),
-    };
-}
-
-
-
-export default function HomeMap() {
-    const [flyoversList, setFlyoversList] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [loadingStatus, setLoadingStatus] = useState("Initializing map...");
-    const [overlayVisible, setOverlayVisible] = useState(true);
-    const [selectedHighway, setSelectedHighway] = useState(null);
-    const [selectedPoint, setSelectedPoint] = useState(null);
-    const [visibleFlyoverIds, setVisibleFlyoverIds] = useState(new Set());
-    const [currentZoom, setCurrentZoom] = useState(REGION_ZOOM);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showTrafficMap, setShowTrafficMap] = useState(false);
-    const [baseLayer, setBaseLayer] = useState("streets");
-
-    // Use the IDW Weather Hook instead of managing state directly
-    const {
-        weatherData,
-        loading: idwLoading,
-        error: idwError,
-        selectedDate,
-        fetchWeather,
-        clearData,
-        changeLayer
-    } = useIDWWeather();
-
-    const [idwLayer, setIdwLayer] = useState(null);
-    const [idwLayerInstance, setIdwLayerInstance] = useState(null);
-    const [bufferBoundary, setBufferBoundary] = useState(null);
-    const [isIdwLayerLoading, setIsIdwLayerLoading] = useState(false);
-
-    const mapWrapperRef = useRef(null);
-    const mapRef = useRef(null);
-
-    const flyoverMarkers = useMemo(() => {
-        const markers = flyoversList.map((flyover, index) => {
-            const color = getFlyoverColor(index);
-            const displayName = getFlyoverDisplayName(flyover.type, index);
-
-            return {
-                ...flyover,
-                color: color,
-                displayName: displayName,
-            };
-        });
-
-        return markers;
-    }, [flyoversList]);
-
-    const isDetailZoom = currentZoom >= POPUP_ZOOM_THRESHOLD;
-
-    const weatherTarget = useMemo(() => {
-        if (selectedPoint) {
-            return {
-                flyoverId: selectedPoint.id,
-                lat: selectedPoint.latlng[0],
-                lng: selectedPoint.latlng[1],
-            };
-        }
-        if (selectedHighway) {
-            return {
-                flyoverId: selectedHighway.id,
-                lat: selectedHighway.center[0],
-                lng: selectedHighway.center[1],
-            };
-        }
-        return null;
-    }, [selectedPoint, selectedHighway]);
-
-    const fullscreenFitData = useMemo(() => {
-        if (selectedHighway) return selectedHighway.geojson || null;
-        const visible = flyoverMarkers.filter((f) => visibleFlyoverIds.has(f.id));
-        if (visible.length === 0) return null;
-        return {
-            type: "FeatureCollection",
-            features: visible.flatMap((f) => f.geojson?.features || []),
-        };
-    }, [selectedHighway, flyoverMarkers, visibleFlyoverIds]);
-
-    const focusTarget = useMemo(() => {
-        if (selectedPoint) {
-            return {
-                latlng: selectedPoint.latlng,
-                key: `point-${selectedPoint.id}`,
-            };
-        }
-        if (selectedHighway) {
-            return {
-                latlng: selectedHighway.center,
-                key: `highway-${selectedHighway.id}`,
-            };
-        }
-        return { latlng: null, key: null };
-    }, [selectedPoint, selectedHighway]);
-
-    const { weather, loading: weatherLoadingFromHook } =
-        useWeather(weatherTarget);
-    const isWeatherLoading = idwLoading || weatherLoadingFromHook;
-
-    // Handle IDW layer selection - using the hook's changeLayer
-    const handleIdwSelect = useCallback(
-        (layerId) => {
-            setIdwLayer(layerId);
-            if (layerId !== null) {
-                changeLayer(layerId);
-            }
-
-            if (layerId === null) {
-                if (idwLayerInstance && mapRef.current) {
-                    try {
-                        mapRef.current.removeLayer(idwLayerInstance);
-                    } catch (e) { }
-                    setIdwLayerInstance(null);
-                }
-                setIsIdwLayerLoading(false);
-                clearData();
-            }
-        },
-        [idwLayerInstance, changeLayer, clearData],
-    );
-
-    // Handle date change - using the hook's fetchWeather
-    const handleDateChange = useCallback(
-        (date) => {
-            fetchWeather(date);
-        },
-        [fetchWeather],
-    );
-
-    // Load buffer boundary for clipping
-    useEffect(() => {
-        let cancelled = false;
-
-        const loadBufferBoundary = async () => {
-            try {
-                const response = await fetch("/data/AOI_Buffer.geojson");
-                if (!response.ok) {
-                    console.warn(`Buffer.geojson request failed: ${response.status}`);
-                    return;
-                }
-                const data = await response.json();
-
-                if (!cancelled) {
-                    const isUTM = data.crs?.properties?.name?.includes("32643");
-                    const isCRS84 = data.crs?.properties?.name?.includes("CRS84");
-
-                    let processedData = data;
-
-                    if (isUTM) {
-                        processedData = convertBufferToWGS84(data);
-                    } else if (isCRS84) {
-                        // already correct
-                    } else {
-                        const firstCoord =
-                            data?.features?.[0]?.geometry?.coordinates?.[0]?.[0];
-                        if (
-                            firstCoord &&
-                            Array.isArray(firstCoord) &&
-                            firstCoord.length === 2
-                        ) {
-                            const [x, y] = firstCoord;
-                            if (x > 1000 || y > 1000) {
-                                processedData = convertBufferToWGS84(data);
-                            }
-                        }
-                    }
-
-                    setBufferBoundary(processedData);
-                }
-            } catch (error) {
-                console.warn(
-                    "Could not load Buffer.geojson, IDW will not be clipped:",
-                    error,
-                );
-            }
-        };
-
-        loadBufferBoundary();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    // Create IDW layer when data is available
-    useEffect(() => {
-        // Remove existing IDW layer
-        if (idwLayerInstance && mapRef.current) {
-            try {
-                mapRef.current.removeLayer(idwLayerInstance);
-            } catch (e) { }
-            setIdwLayerInstance(null);
-        }
-
-        // If no IDW layer selected OR no weather data, don't show loader
-        if (
-            !idwLayer ||
-            !weatherData ||
-            weatherData.length === 0 ||
-            !mapRef.current
-        ) {
-            setIsIdwLayerLoading(false);
-            return;
-        }
-
-        const propertyMap = {
-            temperature: "temp_c",
-            rainfall: "precip_mm",
-            wind: "wind_kph",
-        };
-        const property = propertyMap[idwLayer];
-
-        if (!property) {
-            setIsIdwLayerLoading(false);
-            return;
-        }
-
-        // Show loader only when IDW is selected and we're creating the layer
-        setIsIdwLayerLoading(true);
-
-        // Use setTimeout to allow UI to update before heavy computation
-        setTimeout(() => {
-            try {
-                const newLayer = createIDWLayer(
-                    weatherData,
-                    property,
-                    {
-                        opacity: 0.85,
-                        zIndex: 100,
-                        clipPolygon: bufferBoundary,
-                        cacheKey: `${selectedDate || "latest"}::${property}`,
-                    }
-                );
-
-                newLayer.addTo(mapRef.current);
-                setIdwLayerInstance(newLayer);
-
-                // Hide loader after layer is added
-                setIsIdwLayerLoading(false);
-            } catch (error) {
-                console.error("Error creating IDW layer:", error);
-                setIsIdwLayerLoading(false);
-            }
-        }, 100);
-
-        return () => {
-            if (idwLayerInstance && mapRef.current) {
-                try {
-                    mapRef.current.removeLayer(idwLayerInstance);
-                } catch (e) { }
-                setIdwLayerInstance(null);
-            }
-            setIsIdwLayerLoading(false);
-        };
-    }, [idwLayer, weatherData, bufferBoundary, selectedDate]);
-
-    // Load initial weather data for today
-    useEffect(() => {
-        const today = new Date().toISOString().split("T")[0];
-        fetchWeather(today);
-    }, [fetchWeather]);
-
-    const loadFlyovers = useCallback(async () => {
-        try {
-            const flyovers = await loadFlyoverData();
-            if (flyovers && flyovers.length > 0) {
-                const list = flyovers.map((flyover, index) => ({
-                    id: flyover.id ?? `flyover-${index + 1}`,
-                    geojson: flyover.geojson,
-                    riskStatus: flyover.riskStatus,
-                    center: flyover.center,
-                    type: flyover.type,
-                    namedPoints: flyover.namedPoints || [],
-                }));
-                setFlyoversList(list);
-                setVisibleFlyoverIds(new Set(list.map((f) => f.id)));
-            }
-            setLoadingStatus("Ready");
-        } catch (err) {
-            console.error(err);
-            setLoadingStatus("Failed to load flyover data");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        const loadBaseLayers = async () => {
-            try {
-                setLoadingStatus("Loading map layers...");
-                await loadFlyovers();
-            } catch (err) {
-                console.error(err);
-                setLoadingStatus("Failed to load map data");
-                setLoading(false);
-            }
-        };
-        loadBaseLayers();
-    }, [loadFlyovers]);
-
-    useEffect(() => {
-        if (!loading) {
-            const timeout = setTimeout(() => setOverlayVisible(false), 500);
-            return () => clearTimeout(timeout);
-        }
-    }, [loading]);
-
-    useEffect(() => {
-        const handleChange = () =>
-            setIsFullscreen(Boolean(document.fullscreenElement));
-        document.addEventListener("fullscreenchange", handleChange);
-        return () => document.removeEventListener("fullscreenchange", handleChange);
-    }, []);
-
-    useEffect(() => {
-        if (!mapWrapperRef.current) return;
-
-        const resizeObserver = new ResizeObserver(() => {
-            if (mapRef.current) {
-                mapRef.current.invalidateSize();
-            }
-        });
-
-        resizeObserver.observe(mapWrapperRef.current);
-        return () => resizeObserver.disconnect();
-    }, []);
-
-    const toggleFullscreen = useCallback(() => {
-        if (!document.fullscreenElement) {
-            mapWrapperRef.current?.requestFullscreen?.();
-        } else {
-            document.exitFullscreen?.();
-        }
-    }, []);
-
-    const handleSelectHighway = useCallback((highway) => {
-        setSelectedHighway(highway);
-        setSelectedPoint(null);
-    }, []);
-
-    const handleSelectPoint = useCallback((point, highway) => {
-        setSelectedPoint(point);
-        setSelectedHighway(highway || null);
-    }, []);
-
-    const handleToggleFlyover = useCallback((id) => {
-        setVisibleFlyoverIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-        setSelectedHighway((prev) => {
-            if (prev?.id === id) {
-                setSelectedPoint(null);
-                return null;
-            }
-            return prev;
-        });
-    }, []);
-
-    const handleToggleAllFlyovers = useCallback(() => {
-        setVisibleFlyoverIds((prev) =>
-            prev.size === flyoverMarkers.length && flyoverMarkers.length > 0
-                ? new Set()
-                : new Set(flyoverMarkers.map((f) => f.id)),
-        );
-    }, [flyoverMarkers]);
-
-    const handleToggleTrafficMap = useCallback(() => {
-        setShowTrafficMap((prev) => !prev);
-    }, []);
-
-    const activeBaseLayerUrl = BASE_LAYERS.find((l) => l.id === baseLayer)?.url;
-
-    return (
-        <div
-            ref={mapWrapperRef}
-            className={`w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent ${showTrafficMap ? 'lg:flex-col' : 'lg:flex-row'
-                }`}
-        >
-            <div className={`relative w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''
-                }`}>
-                {overlayVisible && (
-                    <div
-                        className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/70 backdrop-blur-sm transition-opacity duration-500"
-                        style={{ opacity: loading ? 1 : 0 }}
-                    >
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="h-8 w-8 rounded-full border-4 border-gray-300 border-t-[#81198c] animate-spin" />
-                            <p className="text-sm text-gray-700">{loadingStatus}</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* IDW Layer Loading Overlay - Only over the map */}
-                {isIdwLayerLoading && !loading && (
-                    <div
-                        className="absolute inset-0 z-[900] flex items-center justify-center bg-white/60 backdrop-blur-sm"
-                    >
-                        <div className="flex flex-col items-center gap-3 bg-white/90 rounded-xl px-6 py-4 shadow-lg border border-gray-200">
-                            <div className="h-8 w-8 rounded-full border-4 border-gray-300 border-t-[#81198c] animate-spin" />
-                            <p className="text-sm font-medium text-gray-700">
-                                Creating IDW Layer...
-                            </p>
-                            <p className="text-xs text-gray-500">
-                                {idwLayer === 'temperature' && 'Interpolating temperature data'}
-                                {idwLayer === 'rainfall' && 'Interpolating rainfall data'}
-                                {idwLayer === 'wind' && 'Interpolating wind data'}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {/* LEFT CONTROLS — only in Leaflet view */}
-                {!showTrafficMap && (
-                    <div
-                        className="
-              absolute
-              left-[10px]
-              top-[135px]
-              z-[1500]
-              flex
-              flex-col
-              gap-2
-              sm:top-[75px]
-            "
-                    >
-                        <FullscreenButton
-                            isFullscreen={isFullscreen}
-                            onToggle={toggleFullscreen}
-                        />
-                        <BaseLayerSwitcher
-                            activeLayer={baseLayer}
-                            onSelect={setBaseLayer}
-                        />
-                    </div>
-                )}
-
-                {/* EXIT BUTTON - Only show when traffic view is active, positioned on left */}
-                {showTrafficMap && (
-                    <div
-                        className="
-              absolute
-              left-[19px]
-              sm:left-[22px]
-              top-[150px]
-              z-[1500]
-              sm:top-[104px]
-            "
-                    >
-                        <button
-                            onClick={handleToggleTrafficMap}
-                            className="
-                flex items-center justify-center gap-1
-                px-2 py-1
-                rounded-lg
-                shadow-md
-                transition-all duration-200
-                text-[12px] font-semibold
-                whitespace-nowrap
-                bg-blue-500 text-white hover:bg-blue-600
-              "
-                        >
-                            <span>Exit</span>
-                        </button>
-                    </div>
-                )}
-
-                {/* TOP RIGHT CONTROLS - RESPONSIVE */}
-                <div
-                    className="
-            absolute
-            top-2
-            left-1
-            right-1
-            z-[1500]
-            flex
-            flex-row
-            flex-nowrap
-            items-center
-            justify-end
-            gap-2
-            sm:top-3
-            sm:left-auto
-            sm:right-3
-            overflow-visible
-          "
-                >
-                    {/* TRAFFIC BUTTON - Only show when NOT in traffic view */}
-                    {!showTrafficMap && (
-                        <div
-                            className="
-                shrink-0
-                isolate
-                [zoom:0.57]
-                sm:[zoom:1]
-              "
-                        >
-                            <button
-                                onClick={handleToggleTrafficMap}
-                                className="
-                  flex items-center justify-center gap-1
-                  px-2 py-1
-                  rounded-lg
-                  shadow-md
-                  transition-all duration-200
-                  text-[12px] font-semibold
-                  whitespace-nowrap
-                  bg-white text-gray-700 hover:bg-gray-50 border border-gray-200
-                "
-                            >
-                                <TrafficCone className="w-4 h-4 shrink-0 text-blue-500" />
-                                <span>Traffic</span>
-                            </button>
-                        </div>
-                    )}
-
-                    {!showTrafficMap && (
-                        <>
-                            <div
-                                className="
-                  shrink-0
-                  [zoom:0.57]
-                  sm:[zoom:1]
-                "
-                            >
-                                <div className="hidden sm:block">
-                                    <FlyoverDropdown
-                                        flyovers={flyoverMarkers}
-                                        visibleIds={visibleFlyoverIds}
-                                        onToggle={handleToggleFlyover}
-                                        onToggleAll={handleToggleAllFlyovers}
-                                    />
-                                </div>
-                                <div className="block sm:hidden">
-                                    <FlyoverDropdown
-                                        flyovers={flyoverMarkers}
-                                        visibleIds={visibleFlyoverIds}
-                                        onToggle={handleToggleFlyover}
-                                        onToggleAll={handleToggleAllFlyovers}
-                                        compact={true}
-                                    />
-                                </div>
-                            </div>
-
-                            <div
-                                className="
-                  shrink-0
-                  [zoom:0.57]
-                  sm:[zoom:1]
-                "
-                            >
-                                <div className="hidden md:block">
-                                    <IdwLayerDropdown
-                                        selectedId={idwLayer}
-                                        onSelect={handleIdwSelect}
-                                        selectedDate={selectedDate}
-                                        onDateChange={handleDateChange}
-                                        isLoading={isWeatherLoading || isIdwLayerLoading}
-                                        dataCount={weatherData?.length || 0}
-                                        error={idwError}
-                                    />
-                                </div>
-                                <div className="block md:hidden">
-                                    <IdwLayerDropdown
-                                        selectedId={idwLayer}
-                                        onSelect={handleIdwSelect}
-                                        selectedDate={selectedDate}
-                                        onDateChange={handleDateChange}
-                                        isLoading={isWeatherLoading || isIdwLayerLoading}
-                                        dataCount={weatherData?.length || 0}
-                                        error={idwError}
-                                        compact={true}
-                                    />
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                {showTrafficMap ? (
-                    <div style={{ height: "100%", width: "100%" }}>
-                        <GoogleMapComponent />
-                    </div>
-                ) : (
-                    <>
-                        <MapContainer
-                            ref={mapRef}
-                            center={REGION_CENTER}
-                            zoom={REGION_ZOOM}
-                            minZoom={MIN_ZOOM}
-                            maxZoom={MAX_ZOOM}
-                            scrollWheelZoom
-                            zoomControl
-                            attributionControl={false}
-                            style={{ height: "100%", width: "100%" }}
-                        >
-                            <ZoomTracker onZoomChange={setCurrentZoom} />
-
-                            <FullscreenFit
-                                data={fullscreenFitData}
-                                isFullscreen={isFullscreen}
-                            />
-
-                            <TileLayer
-                                key={baseLayer}
-                                url={activeBaseLayerUrl}
-                                subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                                maxZoom={20}
-                                attribution="&copy; Google"
-                            />
-
-                            <FocusOnPoint
-                                latlng={focusTarget.latlng}
-                                triggerKey={focusTarget.key}
-                                zoom={15}
-                            />
-
-                            <FlyoverMarkers
-                                flyoverMarkers={flyoverMarkers}
-                                visibleFlyoverIds={visibleFlyoverIds}
-                                isDetailZoom={isDetailZoom}
-                                isFullscreen={isFullscreen}
-                                weather={weather}
-                                weatherLoading={isWeatherLoading}
-                                onSelectHighway={handleSelectHighway}
-                                onSelectPoint={handleSelectPoint}
-                            />
-                        </MapContainer>
-                    </>
-                )}
-            </div>
-
-            {!isFullscreen && !showTrafficMap && (
-                <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0">
-                    <div className="w-full h-full min-h-0 flex flex-col gap-3">
-                        <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
-                            <div className="flex-1 min-h-0 overflow-y-auto">
-                                <FlyoverDetailsPanel
-                                    selectedHighway={selectedHighway}
-                                    selectedPoint={selectedPoint}
-                                    flyoverMarkers={flyoverMarkers}
-                                    visibleFlyoverIds={visibleFlyoverIds}
-                                    onSelectHighway={handleSelectHighway}
-                                    onSelectPoint={handleSelectPoint}
-                                />
-                                {(selectedHighway || selectedPoint) && (
-                                    <div className="px-3">
-                                        <p className="text-sm font-bold text-gray-700 mb-2 px-1">Weather</p>
-                                        <div className="h-[480px]">
-                                            <WeatherPanel weather={weather} loading={isWeatherLoading} />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-        </div>
-    );
-}
-
-
-
-
-
-
-//idwRenderer.jsx file
-import L from 'leaflet';
-
-
-function idwInterpolate(points, targetX, targetY, power = 2) {
-    let numerator = 0;
-    let denominator = 0;
-
-    for (const point of points) {
-        const dx = targetX - point.x;
-        const dy = targetY - point.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-
-        // Standard IDW weight (like ol-ext)
-        const weight = 1 / Math.pow(dist, power);
-
-        // IMPORTANT: Multiply by 'count' value (like ol-ext's weight: 'count')
-        // In ol-ext, 'count' is the weight factor
-        // Your Angular code passes count as the weight
-        const countWeight = point.count || 1;
-
-        numerator += weight * point.value * countWeight;
-        denominator += weight * countWeight;
-    }
-
-    return numerator / denominator;
-}
-
-/**
- * VIBRANT color gradient for IDW
- */
-function getColor(value) {
-    const v = Math.max(0, Math.min(1, value));
-
-    // 10-stop vibrant gradient
-    const stops = [
-        { pos: 0.00, r: 10, g: 20, b: 80 },      // Deep Navy
-        { pos: 0.10, r: 20, g: 50, b: 130 },     // Dark Blue
-        { pos: 0.25, r: 30, g: 90, b: 190 },     // Blue
-        { pos: 0.40, r: 60, g: 160, b: 220 },    // Light Blue
-        { pos: 0.50, r: 80, g: 200, b: 220 },    // Cyan
-        { pos: 0.60, r: 120, g: 220, b: 140 },   // Light Green
-        { pos: 0.70, r: 200, g: 230, b: 60 },    // Yellow-Green
-        { pos: 0.80, r: 255, g: 210, b: 40 },    // Yellow
-        { pos: 0.90, r: 255, g: 150, b: 20 },    // Orange
-        { pos: 1.00, r: 220, g: 20, b: 20 },     // Red
-    ];
-
-    let i = 0;
-    while (i < stops.length - 1 && stops[i + 1].pos < v) i++;
-
-    if (i >= stops.length - 1) {
-        const last = stops[stops.length - 1];
-        return [last.r, last.g, last.b];
-    }
-
-    const from = stops[i];
-    const to = stops[i + 1];
-    const t = (v - from.pos) / (to.pos - from.pos);
-    const smooth = t * t * (3 - 2 * t);
-
-    return [
-        Math.round(from.r + (to.r - from.r) * smooth),
-        Math.round(from.g + (to.g - from.g) * smooth),
-        Math.round(from.b + (to.b - from.b) * smooth)
-    ];
-}
-
-/**
- * Main IDW Renderer - Matching Angular/ol-ext behavior
- */
-export function renderIDWToCanvas(data, property, bounds, width, height) {
-    return new Promise((resolve, reject) => {
-        if (!data || data.length === 0) {
-            reject(new Error('No data provided'));
-            return;
-        }
-
-        try {
-            console.time('IDW Render');
-            console.log(`🎨 Starting IDW: ${width}x${height}, ${data.length} stations`);
-
-            // Convert points to projected coordinates with COUNT
-            // count = normalized value (0-100) like in Angular
-            let minVal = Infinity;
-            let maxVal = -Infinity;
-
-            // First pass: calculate min/max
-            data.forEach(item => {
-                const value = parseFloat(item[property]);
-                if (!Number.isNaN(value)) {
-                    if (value < minVal) minVal = value;
-                    if (value > maxVal) maxVal = value;
-                }
-            });
-            const range = maxVal - minVal || 1;
-
-            // Second pass: create points with count (like Angular)
-            const points = data
-                .map(item => {
-                    const value = parseFloat(item[property]);
-                    if (Number.isNaN(value) || value === null) return null;
-
-                    const coord = L.CRS.EPSG3857.project(
-                        L.latLng(item.latitude, item.longitude)
-                    );
-
-                    // Calculate count like Angular does
-                    // count = percentage of max value (0-100)
-                    const normalized = (value - minVal) / range;
-                    const count = Math.max(1, Math.round(normalized * 100));
-
-                    return {
-                        x: coord.x,
-                        y: coord.y,
-                        value: value,
-                        count: count, // ← This matches Angular's 'count'
-                        lat: item.latitude,
-                        lng: item.longitude
-                    };
-                })
-                .filter(Boolean);
-
-            if (points.length < 3) {
-                reject(new Error(`Not enough points: ${points.length}`));
-                return;
-            }
-
-            // Get map bounds
-            const sw = L.CRS.EPSG3857.project(L.latLng(bounds.minLat, bounds.minLng));
-            const ne = L.CRS.EPSG3857.project(L.latLng(bounds.maxLat, bounds.maxLng));
-
-            const minX = sw.x;
-            const maxX = ne.x;
-            const minY = sw.y;
-            const maxY = ne.y;
-
-            // Calculate map dimensions
-            const mapWidth = maxX - minX;
-            const mapHeight = maxY - minY;
-
-            console.log(`📊 Range: ${minVal.toFixed(2)} to ${maxVal.toFixed(2)}`);
-            console.log(`📍 Map size: ${(mapWidth / 1000).toFixed(0)}km x ${(mapHeight / 1000).toFixed(0)}km`);
-
-            // Create canvas with HIGH quality
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-
-            // Use power=2 like ol-ext default
-            const gridSize = 1; // Full resolution
-            const power = 2.0; // Standard IDW power (matches ol-ext)
-
-            const imageData = ctx.createImageData(width, height);
-            const dataArray = imageData.data;
-
-            const scaleX = (maxX - minX) / width;
-            const scaleY = (maxY - minY) / height;
-
-            let pixelsRendered = 0;
-
-            // Render each pixel - using ALL points (no search radius)
-            // This matches ol-ext's behavior exactly
-            for (let py = 0; py < height; py += gridSize) {
-                for (let px = 0; px < width; px += gridSize) {
-                    const x = minX + px * scaleX;
-                    const y = minY + py * scaleY;
-
-                    // Skip outside bounds
-                    if (x < minX || x > maxX || y < minY || y > maxY) {
-                        continue;
-                    }
-
-                    // Interpolate using ALL points (like ol-ext)
-                    const value = idwInterpolate(points, x, y, power);
-                    const normalized = Math.max(0, Math.min(1, (value - minVal) / range));
-                    const [r, g, b] = getColor(normalized);
-
-                    const idx = (py * width + px) * 4;
-                    if (idx < dataArray.length) {
-                        dataArray[idx] = r;
-                        dataArray[idx + 1] = g;
-                        dataArray[idx + 2] = b;
-                        dataArray[idx + 3] = 255; // FULL OPAQUE
-                    }
-                    pixelsRendered++;
-                }
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-
-            console.log(`✅ Rendered ${pixelsRendered} pixels`);
-            console.timeEnd('IDW Render');
-            resolve(canvas);
-
-        } catch (error) {
-            console.error('❌ IDW Error:', error);
-            reject(error);
-        }
-    });
-}
-
-export { getColor };
-
-
-
-
-
-
-//idwlayerDropdown.jsx
-import { useState } from "react";
-import { ChevronDown, CloudSun, Calendar } from "lucide-react";
-
-const IDW_LAYER_OPTIONS = [
-    { id: "temperature", label: "Temperature" },
-    { id: "rainfall", label: "Rainfall" },
-    { id: "wind", label: "Wind" },
-];
-
-
-const toLocalDateStr = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-};
-
-const parseLocalDateStr = (dateStr) => {
-    const [y, m, d] = dateStr.split("-").map(Number);
-    return new Date(y, m - 1, d);
-};
-
-export default function IdwLayerDropdown({
-    selectedId,
-    onSelect,
-    selectedDate,
-    onDateChange,
-    isLoading,
-    dataCount,
-    error
-}) {
-    const [open, setOpen] = useState(false);
-    const [datePickerOpen, setDatePickerOpen] = useState(false);
-    const [currentMonth, setCurrentMonth] = useState(new Date());
-
-    // Pin "today" at local midnight once per render.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = toLocalDateStr(today);
-
-    // Last selectable day = today + 7 (8 selectable days total, inclusive).
-    const maxSelectable = new Date(today);
-    maxSelectable.setDate(maxSelectable.getDate() + 2);
-    const maxSelectableStr = toLocalDateStr(maxSelectable);
-
-    // Use selectedDate or today as default
-    const displayDate = selectedDate || todayStr;
-
-    const selectedLabel =
-        IDW_LAYER_OPTIONS.find((o) => o.id === selectedId)?.label || "Weather";
-
-    const formatDisplayDate = (dateStr) => {
-        if (!dateStr) return "Select Date";
-        const date = parseLocalDateStr(dateStr);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
-
-    // Get days in month
-    const getDaysInMonth = (date) => {
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        const days = [];
-
-        const startDay = firstDay.getDay();
-
-        for (let i = 0; i < startDay; i++) {
-            days.push(null);
-        }
-
-        for (let i = 1; i <= lastDay.getDate(); i++) {
-            const dateObj = new Date(year, month, i);
-            const dateStr = toLocalDateStr(dateObj);
-            days.push({
-                day: i,
-                date: dateStr,
-                isToday: dateStr === todayStr,
-                isSelected: dateStr === displayDate,
-                isPast: dateStr < todayStr,
-                isBeyondRange: dateStr > maxSelectableStr,
-                isFuture: dateStr > todayStr
-            });
-        }
-
-        return days;
-    };
-
-    const handleDateSelect = (dateStr) => {
-        if (dateStr) {
-            onDateChange(dateStr);
-            setDatePickerOpen(false);
-        }
-    };
-
-    const changeMonth = (increment) => {
-        setCurrentMonth(prev => {
-            const newDate = new Date(prev);
-            newDate.setMonth(prev.getMonth() + increment);
-            return newDate;
-        });
-    };
-
-    const monthYearDisplay = currentMonth.toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-    });
-
-    const days = getDaysInMonth(currentMonth);
-
-    // Check if a valid IDW option is selected
-    const hasValidSelection = selectedId && IDW_LAYER_OPTIONS.some(opt => opt.id === selectedId);
-
-    return (
-        <div className="relative flex items-center gap-1.5">
-            {/* ===== IDW LAYER DROPDOWN ===== */}
-            <div className="relative">
-                <button
-                    onClick={() => setOpen((o) => !o)}
-                    className="flex items-center gap-2 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-3 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                    <CloudSun className="w-3.5 h-3.5 text-blue-500" />
-                    {selectedLabel}
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                </button>
-
-                {open && (
-                    <>
-                        <div className="fixed inset-0 z-[499]" onClick={() => setOpen(false)} />
-                        <div className="absolute right-0 mt-1 w-32 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 py-1 z-[500] overflow-hidden">
-                            <button
-                                onClick={() => {
-                                    onSelect(null);
-                                    setOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 ${!selectedId ? "text-blue-600 bg-blue-50" : "text-gray-700"
-                                    }`}
-                            >
-                                None
-                            </button>
-                            {IDW_LAYER_OPTIONS.map((opt) => (
-                                <button
-                                    key={opt.id}
-                                    onClick={() => {
-                                        onSelect(opt.id);
-                                        setOpen(false);
-                                    }}
-                                    className={`w-full flex items-center justify-between text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 ${selectedId === opt.id
-                                        ? "text-blue-600 bg-blue-100"
-                                        : "text-gray-700"
-                                        }`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                    </>
-                )}
-            </div>
-
-            {/* ===== DATE PICKER - Only show when valid option is selected ===== */}
-            {hasValidSelection && (
-                <div className="relative">
-                    <button
-                        onClick={() => setDatePickerOpen(!datePickerOpen)}
-                        className="flex items-center gap-1.5 bg-white rounded-lg shadow-md ring-1 ring-gray-200 px-2.5 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                        <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                        <span className="min-w-[70px]">{formatDisplayDate(displayDate)}</span>
-                        <ChevronDown className="w-3 h-3 text-gray-400" />
-                    </button>
-
-                    {datePickerOpen && (
-                        <>
-                            <div className="fixed inset-0 z-[499]" onClick={() => setDatePickerOpen(false)} />
-                            <div className="absolute right-0 mt-1 top-full bg-white rounded-lg shadow-lg ring-1 ring-gray-200 p-2 z-[500] w-[160px]">
-                                <div className="flex flex-col gap-1.5">
-                                    <div className="flex items-center justify-between px-1">
-                                        <button
-                                            onClick={() => changeMonth(-1)}
-                                            className="p-0.5 hover:bg-gray-100 rounded-md transition-colors"
-                                        >
-                                            <ChevronDown className="w-3.5 h-3.5 text-gray-500 rotate-90" />
-                                        </button>
-                                        <span className="text-[11px] font-semibold text-gray-700">
-                                            {monthYearDisplay}
-                                        </span>
-                                        <button
-                                            onClick={() => changeMonth(1)}
-                                            className="p-0.5 hover:bg-gray-100 rounded-md transition-colors"
-                                        >
-                                            <ChevronDown className="w-3.5 h-3.5 text-gray-500 -rotate-90" />
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-7 gap-0.5 text-center">
-                                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                                            <div key={day} className="text-[9px] font-semibold text-gray-600">
-                                                {day}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="grid grid-cols-7 gap-0.5">
-                                        {days.map((day, index) => {
-                                            if (day === null) {
-                                                return <div key={`empty-${index}`} className="h-6" />;
-                                            }
-
-                                            const isDisabled = day.isPast || day.isBeyondRange;
-                                            const isSelected = day.date === displayDate;
-                                            const isToday = day.date === todayStr;
-
-                                            return (
-                                                <button
-                                                    key={day.date}
-                                                    onClick={() => !isDisabled && handleDateSelect(day.date)}
-                                                    disabled={isDisabled}
-                                                    className={`
-                            h-6 w-6 rounded text-[10px] font-medium transition-colors flex items-center justify-center
-                            ${isDisabled ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-blue-50'}
-                            ${isSelected ? 'bg-blue-500 text-white hover:bg-blue-600' : ''}
-                            ${isToday && !isSelected ? 'bg-blue-50 text-blue-600' : ''}
-                            ${!isDisabled && !isSelected && !isToday ? 'text-gray-700' : ''}
-                          `}
-                                                >
-                                                    {day.day}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-
-
-
-
-
-
-
-
-
-
-
-//useIDWWeather.jsx
-import { useState, useCallback } from "react";
-import { fetchIDWWeatherData } from "../services/api";
-
-
-export function useIDWWeather() {
-    const [weatherData, setWeatherData] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [selectedDate, setSelectedDate] = useState(null);
-    const [selectedLayer, setSelectedLayer] = useState('rainfall'); // 'rainfall' | 'wind' | 'temperature'
-
-    // Fetch weather data for a specific date
-
-    const fetchWeather = useCallback(async (date) => {
-        if (!date) {
-            setError('Please select a date');
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            const response = await fetchIDWWeatherData(date);
-
-            if (response && response.data) {
-                setWeatherData(response.data);
-                setSelectedDate(date);
-                console.log(`✅ Weather data loaded for ${date}:`, response.data.length, 'stations');
-            } else {
-                throw new Error('No data received from server');
-            }
-        } catch (err) {
-            setError(err.message || 'Failed to fetch weather data');
-            console.error('❌ Error fetching weather:', err);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    // Change the active layer (only rainfall, wind, temperature)
-    const changeLayer = useCallback((layer) => {
-        if (['rainfall', 'wind', 'temperature'].includes(layer)) {
-            setSelectedLayer(layer);
-        } else {
-            console.warn(`⚠️ Unknown layer: ${layer}`);
-        }
-
-
-    }, []);
-
-    // Clear the current data
-    const clearData = useCallback(() => {
-        setWeatherData(null);
-        setSelectedDate(null);
-        setError(null);
-    }, []);
-
-    return {
-        weatherData,
-        loading,
-        error,
-        selectedDate,
-        selectedLayer,
-        fetchWeather,
-        changeLayer,
-        clearData,
-    };
-
-}
+// // src/components/LandUseLandCover.jsx
+// import { useEffect, useRef, useState, useCallback } from "react";
+// import L from "leaflet";
+// import "leaflet/dist/leaflet.css";
+// import "leaflet-side-by-side";
+// import { Loader2, AlertTriangle, Layers, X, Maximize, Minimize, CircleDot, ChevronDown, Calendar } from "lucide-react";
+// import { useFlyoverData } from "../hooks/useFlyoverData";
+// import { useMovementPoints } from "../hooks/useMovementPoints";
+// import {
+//     getFlyoverColor,
+//     getFlyoverDisplayName,
+//     makeFlyoverIcon,
+//     formatPointName,
+// } from "./map/mapHelpers";
+
+// import MovementPointsChart from "./MovementPointsChart";
+// import MovementDiffChart from "./MovementDiffChart";
+
+// const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+// const TILE_LAYER_URL = "https://mlinfomap.org/nhaiapi/tiles/{year}/{z}/{x}/{y}.png";
+
+// const DEFAULT_CENTER = [30.3, 76.7];
+// const DEFAULT_ZOOM = 10;
+// const MIN_ZOOM = 9;
+// const MAX_ZOOM = 22;
+
+// // LULC Classes for Legend
+// const LULC_CLASSES = [
+//     { color: "#055ac5", label: "Water" },
+//     { color: "#0b832a", label: "Trees" },
+//     { color: "#dae04e", label: "Crop" },
+//     { color: "#f14c40", label: "Builtup" },
+//     { color: "#ecfff8", label: "Bare Ground" },
+//     { color: "#99998f", label: "Rangeland" },
+// ];
+
+// function LULCLegend() {
+//     return (
+//         <div className="absolute bottom-3 right-3 z-[1500] bg-white/95 backdrop-blur-sm rounded-md shadow-md border border-gray-200 px-3 py-2 max-w-[180px]">
+//             <div className="text-[11px] font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+//                 Land Cover
+//             </div>
+//             <div className="flex flex-col gap-1">
+//                 {LULC_CLASSES.map((item) => (
+//                     <div key={item.label} className="flex items-center gap-2">
+//                         <span
+//                             className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-200"
+//                             style={{ backgroundColor: item.color }}
+//                         />
+//                         <span className="text-[10px] text-gray-600 leading-tight">{item.label}</span>
+//                     </div>
+//                 ))}
+//             </div>
+//         </div>
+//     );
+// }
+
+// function YearSelect({ label, value, onChange, disabledYears = [] }) {
+//     return (
+//         <div className="flex items-center gap-2">
+//             <label className="text-sm text-black-700 font-medium">{label}</label>
+//             <select
+//                 value={value}
+//                 onChange={(e) => onChange(Number(e.target.value))}
+//                 className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+//             >
+//                 {YEARS.map((y) => {
+//                     const isDisabled = disabledYears.includes(y);
+//                     return (
+//                         <option
+//                             key={y}
+//                             value={y}
+//                             disabled={isDisabled}
+//                             className={isDisabled ? 'text-gray-400 bg-gray-100' : 'text-gray-900'}
+//                         >
+//                             {y} {isDisabled ? '' : ''}
+//                         </option>
+//                     );
+//                 })}
+//             </select>
+//         </div>
+//     );
+// }
+
+// function FullscreenButton({ isFullscreen, onToggle }) {
+//     return (
+//         <button
+//             onClick={onToggle}
+//             className={`flex items-center justify-center w-[30px] h-[30px] bg-white rounded-md shadow-md border border-gray-200 transition-all duration-200 hover:bg-gray-50 hover:shadow-lg ${isFullscreen ? 'bg-blue-50 border-blue-300 text-blue-600' : 'text-gray-700'}`}
+//             aria-label="Toggle fullscreen"
+//         >
+//             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+//         </button>
+//     );
+// }
+
+// // Layer Selector Dropdown - Updated with "None" option
+// function LayerSelector({ selectedLayer, onLayerChange }) {
+//     const [isOpen, setIsOpen] = useState(false);
+//     const dropdownRef = useRef(null);
+
+//     useEffect(() => {
+//         const handleClickOutside = (event) => {
+//             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+//                 setIsOpen(false);
+//             }
+//         };
+//         document.addEventListener('mousedown', handleClickOutside);
+//         return () => document.removeEventListener('mousedown', handleClickOutside);
+//     }, []);
+
+//     const getLayerLabel = (layer) => {
+//         switch (layer) {
+//             case 'velocity': return 'Velocity';
+//             case 'difference': return 'Difference';
+//             case 'none': return 'None';
+//             default: return 'Velocity';
+//         }
+//     };
+
+//     const getLayerColor = (layer) => {
+//         switch (layer) {
+//             case 'velocity': return 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
+//             case 'difference': return 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200';
+//             case 'none': return 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200';
+//             default: return 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
+//         }
+//     };
+
+//     return (
+//         <div className="relative flex items-center gap-1.5" ref={dropdownRef}>
+//             <span className="text-xs font-medium text-gray-700">Layer:</span>
+//             <button
+//                 onClick={() => setIsOpen(!isOpen)}
+//                 className={`flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 border min-w-[90px] h-[28px] ${getLayerColor(selectedLayer)}`}
+//             >
+//                 <span>{getLayerLabel(selectedLayer)}</span>
+//                 <ChevronDown size={12} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+//             </button>
+
+//             {isOpen && (
+//                 <div className="absolute top-full left-[45px] mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1.5 z-[1600] min-w-[120px]">
+//                     <button
+//                         onClick={() => {
+//                             onLayerChange('velocity');
+//                             setIsOpen(false);
+//                         }}
+//                         className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${selectedLayer === 'velocity' ? 'bg-green-50 text-green-700 font-medium' : 'text-gray-700'
+//                             }`}
+//                     >
+//                         Velocity
+//                     </button>
+//                     <button
+//                         onClick={() => {
+//                             onLayerChange('difference');
+//                             setIsOpen(false);
+//                         }}
+//                         className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${selectedLayer === 'difference' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+//                             }`}
+//                     >
+//                         Difference
+//                     </button>
+//                     <button
+//                         onClick={() => {
+//                             onLayerChange('none');
+//                             setIsOpen(false);
+//                         }}
+//                         className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${selectedLayer === 'none' ? 'bg-gray-50 text-gray-700 font-medium' : 'text-gray-700'
+//                             }`}
+//                     >
+//                         None
+//                     </button>
+//                 </div>
+//             )}
+//         </div>
+//     );
+// }
+
+
+// // Updated DateRangeSelector component with higher z-index
+// // Updated DateRangeSelector component with better sizing
+// function DateRangeSelector({
+//     availableDates = [],
+//     startDate,
+//     endDate,
+//     onStartDateChange,
+//     onEndDateChange,
+//     compact = false
+// }) {
+//     const [isStartOpen, setIsStartOpen] = useState(false);
+//     const [isEndOpen, setIsEndOpen] = useState(false);
+//     const startRef = useRef(null);
+//     const endRef = useRef(null);
+
+//     useEffect(() => {
+//         const handleClickOutside = (event) => {
+//             if (startRef.current && !startRef.current.contains(event.target)) {
+//                 setIsStartOpen(false);
+//             }
+//             if (endRef.current && !endRef.current.contains(event.target)) {
+//                 setIsEndOpen(false);
+//             }
+//         };
+//         document.addEventListener('mousedown', handleClickOutside);
+//         return () => document.removeEventListener('mousedown', handleClickOutside);
+//     }, []);
+
+//     const formatDisplayDate = (dateStr) => {
+//         if (!dateStr) return 'Select Date';
+//         const parts = dateStr.split('-');
+//         return `${parts[1]}/${parts[2]}/${parts[0]}`;
+//     };
+
+//     // Compact version for inline display - outer container matches LayerSelector height
+//     return (
+//         <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 rounded-md border border-blue-200 shadow-sm relative h-[34px]">
+//             {/* Start Date */}
+//             <div className="relative" ref={startRef}>
+//                 <button
+//                     onClick={() => setIsStartOpen(!isStartOpen)}
+//                     className="flex items-center justify-between gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:border-blue-400 transition-colors text-xs min-w-[70px]"
+//                 >
+//                     <span className={startDate ? 'text-gray-800' : 'text-gray-400'}>
+//                         {startDate ? formatDisplayDate(startDate) : 'Start'}
+//                     </span>
+//                     <ChevronDown size={12} className={`text-gray-400 transition-transform ${isStartOpen ? 'rotate-180' : ''}`} />
+//                 </button>
+//                 {isStartOpen && availableDates.length > 0 && (
+//                     <div
+//                         className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto min-w-[110px]"
+//                         style={{
+//                             zIndex: 9999,
+//                             position: 'absolute',
+//                         }}
+//                     >
+//                         {availableDates.map((date) => (
+//                             <button
+//                                 key={date}
+//                                 onClick={() => {
+//                                     onStartDateChange(date);
+//                                     setIsStartOpen(false);
+//                                     if (!endDate || endDate < date) {
+//                                         onEndDateChange(date);
+//                                     }
+//                                 }}
+//                                 className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${startDate === date ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700'
+//                                     }`}
+//                             >
+//                                 {formatDisplayDate(date)}
+//                             </button>
+//                         ))}
+//                     </div>
+//                 )}
+//             </div>
+
+//             <span className="text-gray-400 text-xs">→</span>
+
+//             {/* End Date */}
+//             <div className="relative" ref={endRef}>
+//                 <button
+//                     onClick={() => setIsEndOpen(!isEndOpen)}
+//                     className="flex items-center justify-between gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:border-blue-400 transition-colors text-xs min-w-[70px]"
+//                 >
+//                     <span className={endDate ? 'text-gray-800' : 'text-gray-400'}>
+//                         {endDate ? formatDisplayDate(endDate) : 'End'}
+//                     </span>
+//                     <ChevronDown size={12} className={`text-gray-400 transition-transform ${isEndOpen ? 'rotate-180' : ''}`} />
+//                 </button>
+//                 {isEndOpen && availableDates.length > 0 && (
+//                     <div
+//                         className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto min-w-[110px]"
+//                         style={{
+//                             zIndex: 9999,
+//                             position: 'absolute',
+//                         }}
+//                     >
+//                         {availableDates
+//                             .filter(date => !startDate || date >= startDate)
+//                             .map((date) => (
+//                                 <button
+//                                     key={date}
+//                                     onClick={() => {
+//                                         onEndDateChange(date);
+//                                         setIsEndOpen(false);
+//                                     }}
+//                                     className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${endDate === date ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700'
+//                                         }`}
+//                                 >
+//                                     {formatDisplayDate(date)}
+//                                 </button>
+//                             ))}
+//                     </div>
+//                 )}
+//             </div>
+//         </div>
+//     );
+// }
+
+
+// export default function LandUseLandCover({
+//     mapCenter = DEFAULT_CENTER,
+//     mapZoom = DEFAULT_ZOOM,
+//     defaultLeftYear = YEARS[0],
+//     defaultRightYear = YEARS[YEARS.length - 1],
+//     className = "",
+//     isActive = true,
+// }) {
+//     const mapContainerRef = useRef(null);
+//     const fullscreenContainerRef = useRef(null);
+//     const mapRef = useRef(null);
+//     const leftLayerRef = useRef(null);
+//     const rightLayerRef = useRef(null);
+//     const sideBySideRef = useRef(null);
+//     const streetLayerRef = useRef(null);
+//     const satelliteLayerRef = useRef(null);
+//     const flyoverLayersRef = useRef([]);
+//     const flyoverMarkersRef = useRef([]);
+//     const movementMarkersRef = useRef([]);
+
+//     // Chart states
+//     const [showChart, setShowChart] = useState(false);
+//     const [selectedPointForChart, setSelectedPointForChart] = useState(null);
+//     const [selectedDetailForChart, setSelectedDetailForChart] = useState(null);
+
+//     // Diff Chart states
+//     const [showDiffChart, setShowDiffChart] = useState(false);
+//     const [diffPointData, setDiffPointData] = useState(null);
+//     const [diffDetailData, setDiffDetailData] = useState(null);
+//     const [diffStartDate, setDiffStartDate] = useState('');
+//     const [diffEndDate, setDiffEndDate] = useState('');
+
+//     // Layer selection: 'velocity', 'difference', or 'none'
+//     const [selectedLayer, setSelectedLayer] = useState('velocity');
+
+//     const tagRef = useRef(null);
+//     const dividerLineRef = useRef(null);
+//     const rafIdRef = useRef(null);
+//     const debounceRef = useRef(null);
+//     const dividerReadyTimeoutRef = useRef(null);
+//     const resizeObserverRef = useRef(null);
+//     const isMountedRef = useRef(true);
+//     const isMapReadyRef = useRef(false);
+//     const hasFitBoundsRef = useRef(false);
+//     const requestIdRef = useRef(0);
+
+//     const [yearLeft, setYearLeft] = useState(defaultLeftYear);
+//     const [yearRight, setYearRight] = useState(defaultRightYear);
+//     const [loading, setLoading] = useState(true);
+//     const [error, setError] = useState(null);
+//     const [isDividerReady, setIsDividerReady] = useState(false);
+//     const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+//     const [isFullscreen, setIsFullscreen] = useState(false);
+//     const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false);
+//     const [activeLayers, setActiveLayers] = useState(['flyover', 'movement']); // Changed: Add movement by default
+//     const [baseLayer, setBaseLayer] = useState('streets');
+
+//     const { flyovers, loading: flyoversLoading } = useFlyoverData();
+
+//     const {
+//         points: movementPoints,
+//         loading: movementLoading,
+//         total: movementTotal,
+//         error: movementError,
+//         availableDates,
+//         selectPoint,
+//         selectedPointData,
+//         loadingDetail,
+//     } = useMovementPoints();
+
+//     // Set default dates when available
+//     useEffect(() => {
+//         if (availableDates && availableDates.length > 0 && !diffStartDate && !diffEndDate) {
+//             setDiffStartDate(availableDates[0]);
+//             setDiffEndDate(availableDates[availableDates.length - 1]);
+//         }
+//     }, [availableDates]);
+
+//     // Log the data to verify it's working
+//     useEffect(() => {
+//         if (movementPoints && movementPoints.length > 0) {
+//             console.log(`✅ Movement Points loaded: ${movementPoints.length} points`);
+//             console.log('📊 Sample point:', movementPoints[0]);
+//         }
+//         if (movementError) {
+//             console.error('❌ Movement Points Error:', movementError);
+//         }
+//         if (availableDates && availableDates.length > 0) {
+//             console.log('📅 Available dates:', availableDates);
+//         }
+//     }, [movementPoints, movementError, availableDates]);
+
+//     // Handle layer change (Velocity, Difference, or None)
+//     const handleLayerChange = useCallback((layer) => {
+//         console.log('🔄 Layer changed to:', layer);
+//         setSelectedLayer(layer);
+
+//         if (layer === 'velocity') {
+//             setActiveLayers(prev => {
+//                 const newLayers = prev.filter(id => id !== 'difference');
+//                 if (!newLayers.includes('movement')) {
+//                     newLayers.push('movement');
+//                 }
+//                 return newLayers;
+//             });
+//             // Clear diff chart
+//             setShowDiffChart(false);
+//             setDiffPointData(null);
+//             setDiffDetailData(null);
+//         } else if (layer === 'difference') {
+//             setActiveLayers(prev => {
+//                 const newLayers = prev.filter(id => id !== 'movement');
+//                 if (!newLayers.includes('difference')) {
+//                     newLayers.push('difference');
+//                 }
+//                 return newLayers;
+//             });
+//         } else if (layer === 'none') {
+//             // Remove movement points from map when None is selected
+//             setActiveLayers(prev => {
+//                 const newLayers = prev.filter(id => id !== 'movement' && id !== 'difference');
+//                 return newLayers;
+//             });
+//             // Clear any open charts
+//             setShowChart(false);
+//             setSelectedPointForChart(null);
+//             setSelectedDetailForChart(null);
+//             setShowDiffChart(false);
+//             setDiffPointData(null);
+//             setDiffDetailData(null);
+//         }
+//     }, []);
+
+//     // Add movement point circles to map with hover and click
+//     const addMovementPointsToMap = useCallback((map, points) => {
+//         if (!points || points.length === 0) return;
+
+//         // Clear existing markers
+//         movementMarkersRef.current.forEach(marker => {
+//             if (map.hasLayer(marker)) {
+//                 map.removeLayer(marker);
+//             }
+//         });
+//         movementMarkersRef.current = [];
+
+//         points.forEach((feature) => {
+//             const { id, longitude, latitude, velocity, coherence } = feature.data;
+
+//             const circle = L.circle([latitude, longitude], {
+//                 pane: 'movementPane',
+//                 radius: 4,
+//                 fillColor: '#8a0b68',
+//                 color: '#0d0101',
+//                 weight: 2,
+//                 opacity: 1,
+//                 fillOpacity: 0.8,
+//             });
+
+//             circle.on('mouseover', function (e) {
+//                 this.setStyle({
+//                     fillColor: '#ff6b6b',
+//                     color: '#ff0000',
+//                     weight: 4,
+//                     fillOpacity: 0.9,
+//                 });
+
+//                 // Show tooltip ONLY when velocity layer is selected
+//                 if (selectedLayer === 'velocity') {
+//                     const tooltipContent = `
+//                     <div style="padding: 2px 6px; font-size: 12px; font-weight: 600; line-height: 1.3;">
+//                         Point ID: ${id}<br/>
+//                         Velocity: ${velocity} mm/yr
+//                     </div>
+//                 `;
+
+//                     this.bindTooltip(tooltipContent, {
+//                         permanent: false,
+//                         direction: 'top',
+//                         offset: [0, -10],
+//                         className: 'velocity-tooltip',
+//                     }).openTooltip();
+//                 } else {
+//                     // Close any existing tooltip when in difference or none mode
+//                     this.closeTooltip();
+//                 }
+//             });
+
+//             circle.on('mouseout', function (e) {
+//                 this.setStyle({
+//                     fillColor: '#8a0b68',
+//                     color: '#0d0101',
+//                     weight: 2,
+//                     fillOpacity: 0.8,
+//                 });
+//                 this.closeTooltip();
+//             });
+
+//             circle.on('click', async function (e) {
+//                 // Only handle clicks if not in 'none' mode
+//                 if (selectedLayer === 'none') return;
+
+//                 try {
+//                     this.setStyle({
+//                         fillColor: '#ffd93d',
+//                         color: '#f59f00',
+//                         weight: 4,
+//                     });
+
+//                     const detailData = await selectPoint(id);
+
+//                     if (detailData) {
+//                         if (selectedLayer === 'difference' && diffStartDate && diffEndDate) {
+//                             // Show difference chart
+//                             setDiffPointData(feature);
+//                             setDiffDetailData(detailData);
+//                             setShowDiffChart(true);
+//                         } else {
+//                             // Show regular movement chart
+//                             setSelectedPointForChart(feature);
+//                             setSelectedDetailForChart(detailData);
+//                             setShowChart(true);
+//                         }
+
+//                         this.setStyle({
+//                             fillColor: '#8a0b68',
+//                             color: '#0d0101',
+//                             weight: 2,
+//                         });
+//                     }
+//                 } catch (err) {
+//                     console.error('Error fetching point details:', err);
+//                     this.setStyle({
+//                         fillColor: '#8a0b68',
+//                         color: '#0d0101',
+//                         weight: 2,
+//                     });
+//                 }
+//             });
+
+//             movementMarkersRef.current.push(circle);
+//         });
+
+//         // Only add markers if not in 'none' mode
+//         if (selectedLayer !== 'none') {
+//             movementMarkersRef.current.forEach(marker => {
+//                 marker.addTo(map);
+//             });
+//         }
+
+//         console.log(`✅ Added ${movementMarkersRef.current.length} movement point circles to map`);
+//     }, [selectedLayer, selectPoint, diffStartDate, diffEndDate]);
+
+//     // Update movement points visibility based on selected layer
+//     const updateMovementVisibility = useCallback(() => {
+//         if (!mapRef.current) return;
+
+//         if (selectedLayer === 'none') {
+//             // Remove all movement markers
+//             movementMarkersRef.current.forEach(marker => {
+//                 if (mapRef.current.hasLayer(marker)) {
+//                     mapRef.current.removeLayer(marker);
+//                 }
+//             });
+//         } else {
+//             // Add all movement markers
+//             movementMarkersRef.current.forEach(marker => {
+//                 if (!mapRef.current.hasLayer(marker)) {
+//                     marker.addTo(mapRef.current);
+//                 }
+//             });
+//         }
+//     }, [selectedLayer]);
+
+//     // Load movement points when data arrives
+//     useEffect(() => {
+//         if (!mapRef.current || !isActive) return;
+//         if (!movementPoints || movementPoints.length === 0) return;
+
+//         setTimeout(() => {
+//             try {
+//                 addMovementPointsToMap(mapRef.current, movementPoints);
+//             } catch (err) {
+//                 console.error("[LULC] Error adding movement points:", err);
+//             }
+//         }, 500);
+//     }, [movementPoints, isActive, addMovementPointsToMap]);
+
+//     // Update points when layer changes (to update tooltips and visibility)
+//     useEffect(() => {
+//         if (mapRef.current && movementPoints && movementPoints.length > 0) {
+//             // When switching to 'none', just hide the markers without re-adding
+//             if (selectedLayer === 'none') {
+//                 updateMovementVisibility();
+//             } else {
+//                 // Re-add with updated tooltip behavior
+//                 addMovementPointsToMap(mapRef.current, movementPoints);
+//             }
+//         }
+//     }, [selectedLayer, diffStartDate, diffEndDate, addMovementPointsToMap, updateMovementVisibility]);
+
+//     const availableLayers = [
+//         { id: 'flyover', name: 'Assets', color: '#3B82F6', type: 'overlay' },
+//     ];
+
+//     // Track mobile breakpoint
+//     useEffect(() => {
+//         const handleResize = () => setIsMobile(window.innerWidth <= 1024);
+//         window.addEventListener("resize", handleResize);
+//         return () => window.removeEventListener("resize", handleResize);
+//     }, []);
+
+
+
+//     // ---- Remove default browser focus outline on Leaflet interactive shapes ----
+//     useEffect(() => {
+//         const style = document.createElement('style');
+//         style.textContent = `
+//         .leaflet-interactive:focus,
+//         .leaflet-interactive:focus-visible {
+//             outline: none !important;
+//         }
+//         path.leaflet-interactive:focus {
+//             outline: none !important;
+//         }
+//     `;
+//         document.head.appendChild(style);
+//         return () => document.head.removeChild(style);
+//     }, []);
+
+//     // Fullscreen handler
+//     useEffect(() => {
+//         const handleFullscreenChange = () => {
+//             setIsFullscreen(!!document.fullscreenElement);
+//             setTimeout(() => {
+//                 try {
+//                     if (mapRef.current && mapContainerRef.current) {
+//                         if (document.contains(mapContainerRef.current)) {
+//                             mapRef.current.invalidateSize();
+//                         }
+//                     }
+//                 } catch (err) {
+//                     console.error("[LULC] Error during fullscreen change:", err);
+//                 }
+//             }, 200);
+//         };
+//         document.addEventListener("fullscreenchange", handleFullscreenChange);
+//         return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+//     }, []);
+
+//     // Update visibility when activeLayers change (flyover only)
+//     useEffect(() => {
+//         if (mapRef.current) {
+//             updateLayerVisibility();
+//         }
+//     }, [activeLayers]);
+
+//     // ---- Divider handlers ----
+//     const handleDividerMove = useCallback(() => {
+//         if (rafIdRef.current) return;
+//         rafIdRef.current = requestAnimationFrame(() => {
+//             rafIdRef.current = null;
+//             if (!sideBySideRef.current) return;
+//             const pos = sideBySideRef.current.getPosition();
+//             const px = `${pos}px`;
+//             if (tagRef.current) tagRef.current.style.left = px;
+//             if (dividerLineRef.current) dividerLineRef.current.style.left = px;
+//         });
+//     }, []);
+
+//     // ---- Update layer visibility (flyovers only) ----
+//     const updateLayerVisibility = useCallback(() => {
+//         if (!mapRef.current) return;
+
+//         if (activeLayers.includes('flyover')) {
+//             flyoverLayersRef.current.forEach(layer => {
+//                 if (!mapRef.current.hasLayer(layer)) {
+//                     mapRef.current.addLayer(layer);
+//                 }
+//             });
+//             flyoverMarkersRef.current.forEach(marker => {
+//                 if (!mapRef.current.hasLayer(marker)) {
+//                     mapRef.current.addLayer(marker);
+//                 }
+//             });
+//         } else {
+//             flyoverLayersRef.current.forEach(layer => {
+//                 if (mapRef.current.hasLayer(layer)) {
+//                     mapRef.current.removeLayer(layer);
+//                 }
+//             });
+//             flyoverMarkersRef.current.forEach(marker => {
+//                 if (mapRef.current.hasLayer(marker)) {
+//                     mapRef.current.removeLayer(marker);
+//                 }
+//             });
+//         }
+//     }, [activeLayers]);
+
+//     // ---- Handle layer toggling ----
+//     const handleLayerToggle = useCallback((layerId) => {
+//         setActiveLayers(prev => {
+//             if (prev.includes(layerId)) {
+//                 return prev.filter(id => id !== layerId);
+//             } else {
+//                 return [...prev, layerId];
+//             }
+//         });
+//     }, []);
+
+//     // ---- Handle base layer change ----
+//     const handleBaseLayerChange = useCallback((layerType) => {
+//         setBaseLayer(layerType);
+//         if (!mapRef.current) return;
+
+//         try {
+//             if (layerType === 'streets') {
+//                 if (satelliteLayerRef.current && mapRef.current.hasLayer(satelliteLayerRef.current)) {
+//                     mapRef.current.removeLayer(satelliteLayerRef.current);
+//                 }
+//                 if (streetLayerRef.current && !mapRef.current.hasLayer(streetLayerRef.current)) {
+//                     mapRef.current.addLayer(streetLayerRef.current);
+//                 }
+//             } else if (layerType === 'satellite') {
+//                 if (streetLayerRef.current && mapRef.current.hasLayer(streetLayerRef.current)) {
+//                     mapRef.current.removeLayer(streetLayerRef.current);
+//                 }
+//                 if (satelliteLayerRef.current && !mapRef.current.hasLayer(satelliteLayerRef.current)) {
+//                     mapRef.current.addLayer(satelliteLayerRef.current);
+//                 }
+//             }
+
+//             const leftLayer = leftLayerRef.current;
+//             const rightLayer = rightLayerRef.current;
+//             if (leftLayer && mapRef.current.hasLayer(leftLayer)) {
+//                 leftLayer.setZIndex(10);
+//             }
+//             if (rightLayer && mapRef.current.hasLayer(rightLayer)) {
+//                 rightLayer.setZIndex(10);
+//             }
+
+//             if (sideBySideRef.current && typeof sideBySideRef.current._updateClip === 'function') {
+//                 sideBySideRef.current._updateClip();
+//             }
+//         } catch (err) {
+//             console.error("[LULC] Error switching base layer:", err);
+//         }
+//     }, []);
+
+//     // ---- Toggle fullscreen ----
+//     const toggleFullscreen = useCallback(() => {
+//         try {
+//             const container = fullscreenContainerRef.current;
+//             if (!document.fullscreenElement) {
+//                 if (container?.requestFullscreen) {
+//                     container.requestFullscreen();
+//                 }
+//             } else {
+//                 if (document.exitFullscreen) {
+//                     document.exitFullscreen();
+//                 }
+//             }
+//         } catch (err) {
+//             console.error("[LULC] Error toggling fullscreen:", err);
+//         }
+//     }, []);
+
+//     // ---- Create tile layers for side-by-side comparison ----
+//     const createLayers = useCallback(() => {
+//         if (!mapRef.current || !isActive) {
+//             return;
+//         }
+
+//         if (debounceRef.current) clearTimeout(debounceRef.current);
+
+//         const requestId = ++requestIdRef.current;
+
+//         debounceRef.current = setTimeout(() => {
+//             setLoading(true);
+//             setError(null);
+
+//             try {
+//                 const map = mapRef.current;
+
+//                 if (sideBySideRef.current) {
+//                     map.removeControl(sideBySideRef.current);
+//                     sideBySideRef.current = null;
+//                 }
+//                 if (leftLayerRef.current && map.hasLayer(leftLayerRef.current)) {
+//                     map.removeLayer(leftLayerRef.current);
+//                 }
+//                 if (rightLayerRef.current && map.hasLayer(rightLayerRef.current)) {
+//                     map.removeLayer(rightLayerRef.current);
+//                 }
+
+//                 map.invalidateSize();
+
+//                 const leftUrl = TILE_LAYER_URL.replace('{year}', yearLeft);
+//                 const leftLayer = L.tileLayer(leftUrl, {
+//                     tileSize: 256,
+//                     minZoom: MIN_ZOOM,
+//                     maxZoom: MAX_ZOOM,
+//                     crossOrigin: true,
+//                     opacity: 1,
+//                     zIndex: 10,
+//                 });
+
+//                 const rightUrl = TILE_LAYER_URL.replace('{year}', yearRight);
+//                 const rightLayer = L.tileLayer(rightUrl, {
+//                     tileSize: 256,
+//                     minZoom: MIN_ZOOM,
+//                     maxZoom: MAX_ZOOM,
+//                     crossOrigin: true,
+//                     opacity: 1,
+//                     zIndex: 10,
+//                 });
+
+//                 leftLayer.addTo(map);
+//                 rightLayer.addTo(map);
+
+//                 sideBySideRef.current = L.control
+//                     .sideBySide([leftLayer], [rightLayer])
+//                     .addTo(map);
+//                 sideBySideRef.current.setPosition(0.5);
+//                 sideBySideRef.current.on("dividermove", handleDividerMove);
+
+//                 leftLayerRef.current = leftLayer;
+//                 rightLayerRef.current = rightLayer;
+
+//                 requestAnimationFrame(() => {
+//                     requestAnimationFrame(() => {
+//                         if (requestId !== requestIdRef.current) return;
+//                         handleDividerMove();
+//                     });
+//                 });
+
+//                 if (!hasFitBoundsRef.current) {
+//                     const bounds = map.getBounds();
+//                     if (bounds.isValid()) {
+//                         map.fitBounds(bounds);
+//                         hasFitBoundsRef.current = true;
+//                     }
+//                 }
+
+//                 if (dividerReadyTimeoutRef.current) clearTimeout(dividerReadyTimeoutRef.current);
+//                 dividerReadyTimeoutRef.current = setTimeout(() => {
+//                     if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+
+//                     const pos = sideBySideRef.current?.getPosition() ?? (mapContainerRef.current?.clientWidth ?? 0) / 2;
+
+//                     if (tagRef.current) tagRef.current.style.left = `${pos}px`;
+//                     if (dividerLineRef.current) dividerLineRef.current.style.left = `${pos}px`;
+
+//                     setIsDividerReady(true);
+//                     setLoading(false);
+//                 }, 100);
+
+//                 map.invalidateSize();
+
+//             } catch (err) {
+//                 console.error("Error creating tile layers:", err);
+//                 if (isMountedRef.current && requestId === requestIdRef.current) {
+//                     setError(err?.message || "Failed to load tile layers.");
+//                     setLoading(false);
+//                 }
+//             }
+//         }, 100);
+
+//         return () => {
+//             clearTimeout(debounceRef.current);
+//         };
+//     }, [isActive, yearLeft, yearRight, handleDividerMove]);
+
+//     // ---- Add flyover layers ----
+//     const addFlyoverLayers = useCallback((map) => {
+//         if (!flyovers || flyovers.length === 0) return;
+
+//         try {
+//             requestAnimationFrame(() => {
+//                 flyoverLayersRef.current.forEach(layer => {
+//                     try {
+//                         if (map.hasLayer(layer)) {
+//                             map.removeLayer(layer);
+//                         }
+//                     } catch (err) {
+//                         console.error("[LULC] Error removing flyover layer:", err);
+//                     }
+//                 });
+//                 flyoverLayersRef.current = [];
+
+//                 flyoverMarkersRef.current.forEach(marker => {
+//                     try {
+//                         if (map.hasLayer(marker)) {
+//                             map.removeLayer(marker);
+//                         }
+//                     } catch (err) {
+//                         console.error("[LULC] Error removing flyover marker:", err);
+//                     }
+//                 });
+//                 flyoverMarkersRef.current = [];
+
+//                 flyovers.forEach((flyover, index) => {
+//                     try {
+//                         const color = getFlyoverColor(index);
+//                         const displayName = getFlyoverDisplayName(flyover.type, index);
+
+//                         if (flyover.geojson) {
+//                             try {
+//                                 const layer = L.geoJSON(flyover.geojson, {
+//                                     style: {
+//                                         color: color,
+//                                         weight: 3,
+//                                         opacity: 0.8,
+//                                         fillColor: color,
+//                                         fillOpacity: 0.2,
+//                                     },
+//                                 });
+//                                 flyoverLayersRef.current.push(layer);
+//                             } catch (err) {
+//                                 console.error(`[LULC] Error adding flyover layer for ${displayName}:`, err);
+//                             }
+//                         }
+
+//                         if (flyover.namedPoints && flyover.namedPoints.length > 0) {
+//                             flyover.namedPoints.forEach((point) => {
+//                                 try {
+//                                     const pointName = formatPointName(point.name);
+//                                     const icon = makeFlyoverIcon({
+//                                         color: color,
+//                                         labelText: pointName,
+//                                         detailed: false,
+//                                         name: pointName,
+//                                         detailFields: [],
+//                                     });
+
+//                                     const marker = L.marker(point.latlng, {
+//                                         icon: icon,
+//                                         riseOnHover: true,
+//                                         zIndexOffset: 100,
+//                                     });
+
+//                                     const popupContent = `
+//                                         <div style="padding: 8px; font-family: Arial, sans-serif;">
+//                                             <h4 style="margin: 0 0 4px 0; color: ${color};">${pointName}</h4>
+//                                             ${point.chainage ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Chainage:</strong> ${point.chainage}</p>` : ''}
+//                                             ${point.description ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Type:</strong> ${point.description}</p>` : ''}
+//                                             ${point.length ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Length:</strong> ${point.length}</p>` : ''}
+//                                             ${point.detail ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Structure:</strong> ${point.detail}</p>` : ''}
+//                                         </div>
+//                                     `;
+
+//                                     marker.bindPopup(popupContent, {
+//                                         maxWidth: 300,
+//                                         autoPan: true,
+//                                     });
+
+//                                     flyoverMarkersRef.current.push(marker);
+//                                 } catch (err) {
+//                                     console.error(`[LULC] Error adding marker for ${point.name}:`, err);
+//                                 }
+//                             });
+//                         }
+//                     } catch (err) {
+//                         console.error(`[LULC] Error processing flyover ${index}:`, err);
+//                     }
+//                 });
+
+//                 updateLayerVisibility();
+//             });
+//         } catch (err) {
+//             console.error("[LULC] Error in addFlyoverLayers:", err);
+//         }
+//     }, [flyovers, updateLayerVisibility]);
+
+//     // ---- Initialize map ----
+//     useEffect(() => {
+//         isMountedRef.current = true;
+//         if (mapRef.current || !mapContainerRef.current) return;
+
+//         try {
+//             const map = L.map(mapContainerRef.current, {
+//                 center: mapCenter,
+//                 zoom: DEFAULT_ZOOM,
+//                 minZoom: MIN_ZOOM,
+//                 maxZoom: MAX_ZOOM,
+//                 zoomControl: true,
+//                 attributionControl: false,
+//             });
+
+//             const streetLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+//                 subdomains: ["mt0", "mt1", "mt2", "mt3"],
+//                 maxZoom: 25,
+//                 attribution: "",
+//                 zIndex: 1,
+//             });
+
+//             const satelliteLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+//                 subdomains: ["mt0", "mt1", "mt2", "mt3"],
+//                 maxZoom: 25,
+//                 attribution: "",
+//                 zIndex: 1,
+//             });
+
+//             streetLayerRef.current = streetLayer;
+//             satelliteLayerRef.current = satelliteLayer;
+
+//             streetLayer.addTo(map);
+
+//             L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
+
+//             mapRef.current = map;
+//             isMapReadyRef.current = true;
+
+//             map.createPane('movementPane');
+//             map.getPane('movementPane').style.zIndex = 550;
+//             map.getPane('movementPane').style.pointerEvents = 'auto';
+
+//             const popupPane = map.getPane('popupPane');
+//             const mapPaneEl = map.getPane('mapPane');
+
+//             if (popupPane && mapPaneEl && popupPane.parentNode === mapPaneEl) {
+//                 map.getContainer().appendChild(popupPane);
+//                 popupPane.style.zIndex = '1400';
+//                 popupPane.style.pointerEvents = 'none';
+
+//                 const syncPopupPanePosition = () => {
+//                     if (popupPane && mapPaneEl) {
+//                         popupPane.style.transform = mapPaneEl.style.transform;
+//                     }
+//                 };
+//                 map.on('move zoom viewreset', syncPopupPanePosition);
+//                 syncPopupPanePosition();
+//             }
+
+//             if (typeof ResizeObserver !== "undefined") {
+//                 resizeObserverRef.current = new ResizeObserver(() => {
+//                     try {
+//                         if (mapRef.current && mapContainerRef.current) {
+//                             if (document.contains(mapContainerRef.current)) {
+//                                 mapRef.current.invalidateSize();
+//                             }
+//                         }
+//                     } catch (err) {
+//                         console.error("[LULC] Error in resize observer:", err);
+//                     }
+//                 });
+//                 resizeObserverRef.current.observe(mapContainerRef.current);
+//             }
+
+//             if (flyovers && flyovers.length > 0) {
+//                 setTimeout(() => {
+//                     try {
+//                         addFlyoverLayers(map);
+//                     } catch (err) {
+//                         console.error("[LULC] Error adding flyover layers:", err);
+//                     }
+//                 }, 300);
+//             }
+
+//             setTimeout(() => {
+//                 createLayers();
+//             }, 200);
+
+//             return () => {
+//                 isMountedRef.current = false;
+//                 if (debounceRef.current) clearTimeout(debounceRef.current);
+//                 if (dividerReadyTimeoutRef.current) clearTimeout(dividerReadyTimeoutRef.current);
+//                 if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+//                 resizeObserverRef.current?.disconnect();
+//                 sideBySideRef.current = null;
+//                 leftLayerRef.current = null;
+//                 rightLayerRef.current = null;
+//                 if (mapRef.current) {
+//                     try {
+//                         mapRef.current.remove();
+//                         mapRef.current = null;
+//                     } catch (err) {
+//                         console.error("[LULC] Error removing map:", err);
+//                     }
+//                 }
+//                 isMapReadyRef.current = false;
+//             };
+
+//         } catch (err) {
+//             console.error("[LULC] Error initializing map:", err);
+//             setError("Failed to initialize map. Please try again.");
+//             setLoading(false);
+//         }
+//     }, []);
+
+//     // ---- Add flyovers when data changes ----
+//     useEffect(() => {
+//         if (!mapRef.current || !isActive) return;
+//         if (!flyovers || flyovers.length === 0) return;
+
+//         setTimeout(() => {
+//             try {
+//                 addFlyoverLayers(mapRef.current);
+//             } catch (err) {
+//                 console.error("[LULC] Error adding flyover layers:", err);
+//             }
+//         }, 500);
+//     }, [flyovers, isActive, addFlyoverLayers]);
+
+//     // ---- Recreate layers when year changes ----
+//     useEffect(() => {
+//         if (!mapRef.current || !isActive) return;
+//         createLayers();
+//     }, [yearLeft, yearRight, isActive, createLayers]);
+
+//     // ---- Remove layers when inactive ----
+//     useEffect(() => {
+//         if (!mapRef.current) return;
+
+//         if (!isActive) {
+//             if (sideBySideRef.current) {
+//                 mapRef.current.removeControl(sideBySideRef.current);
+//                 sideBySideRef.current = null;
+//             }
+//             if (leftLayerRef.current && mapRef.current.hasLayer(leftLayerRef.current)) {
+//                 mapRef.current.removeLayer(leftLayerRef.current);
+//                 leftLayerRef.current = null;
+//             }
+//             if (rightLayerRef.current && mapRef.current.hasLayer(rightLayerRef.current)) {
+//                 mapRef.current.removeLayer(rightLayerRef.current);
+//                 rightLayerRef.current = null;
+//             }
+//             setIsDividerReady(false);
+//         }
+//     }, [isActive]);
+
+//     // ---- Force resize when active ----
+//     useEffect(() => {
+//         if (!isActive || !mapRef.current || !mapContainerRef.current) return;
+
+//         const raf = requestAnimationFrame(() => {
+//             try {
+//                 if (mapRef.current && mapContainerRef.current) {
+//                     if (document.contains(mapContainerRef.current)) {
+//                         mapRef.current.invalidateSize();
+//                     }
+//                 }
+//             } catch (err) {
+//                 console.error("[LULC] Error invalidating size on active:", err);
+//             }
+//         });
+
+//         return () => cancelAnimationFrame(raf);
+//     }, [isActive]);
+
+//     // Check if difference should be shown
+//     const showDifferenceUI = selectedLayer === 'difference';
+
+//     return (
+//         <div className={`flex flex-col h-full w-full ${className}`} ref={fullscreenContainerRef} style={{ background: '#ffffff', paddingTop: isFullscreen ? '10px' : '0px', }}>
+//             <div
+//                 className="flex flex-wrap items-center justify-between gap-3 mb-2 px-3 py-2 rounded-lg relative z-[2000]"
+//                 style={{
+//                     background: 'linear-gradient(135deg, #e0e7ff 0%, #dbeafe 50%, #ede9fe 100%)',
+//                     borderRadius: '10px',
+//                     boxShadow: '0 2px 10px rgba(99, 102, 241, 0.1)',
+//                     border: '1px solid rgba(99, 102, 241, 0.1)',
+//                 }}
+//             >
+//                 <div className="flex items-center gap-3 flex-wrap">
+//                     <span className="font-bold text-black text-md tracking-wide">
+//                         Land Cover Comparison
+//                     </span>
+
+//                     {/* Layer Selector */}
+//                     <LayerSelector
+//                         selectedLayer={selectedLayer}
+//                         onLayerChange={handleLayerChange}
+//                     />
+
+//                     {/* Date Range Selector - Inline when Difference is selected */}
+//                     {showDifferenceUI && availableDates.length > 0 && (
+//                         <DateRangeSelector
+//                             availableDates={availableDates}
+//                             startDate={diffStartDate}
+//                             endDate={diffEndDate}
+//                             onStartDateChange={setDiffStartDate}
+//                             onEndDateChange={setDiffEndDate}
+//                             compact={true}
+//                         />
+//                     )}
+//                 </div>
+
+//                 <div className="flex items-center gap-4">
+//                     <YearSelect label="Left" value={yearLeft} onChange={setYearLeft} disabledYears={[yearRight]} />
+//                     <YearSelect label="Right" value={yearRight} onChange={setYearRight} disabledYears={[yearLeft]} />
+//                 </div>
+//             </div>
+
+
+
+
+//             <div
+//                 className="flex-1 min-h-0 relative rounded-lg overflow-hidden border border-gray-200"
+//                 style={{
+//                     height: isMobile ? "450px" : "100%",
+//                     minHeight: isMobile ? "400px" : "auto",
+//                 }}
+//             >
+//                 <div ref={mapContainerRef} className="absolute inset-0" />
+
+//                 {/* Legend */}
+//                 {!loading && !error && <LULCLegend />}
+
+//                 {/* Fullscreen Button */}
+//                 <div className="absolute top-3 right-3 z-[1500]">
+//                     <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+//                 </div>
+
+//                 {/* Layer Control */}
+//                 {!loading && !error && (
+//                     <div
+//                         className="absolute left-2.5 z-[1500]"
+//                         style={{ top: isMobile ? '140px' : '80px' }}
+//                     >
+//                         <button
+//                             onClick={() => setIsLayerPanelOpen(!isLayerPanelOpen)}
+//                             className={`
+//                                 flex items-center justify-center w-[34px] h-[34px]
+//                                 bg-white rounded-[4px] border-2
+//                                 transition-all duration-200 hover:bg-gray-50
+//                                 ${isLayerPanelOpen
+//                                     ? 'border-blue-500 bg-blue-50 text-blue-600'
+//                                     : 'border-gray-400 text-gray-700 hover:border-gray-500'
+//                                 }
+//                                 focus:outline-none focus:ring-0
+//                                 leaflet-bar
+//                             `}
+//                             style={{ boxShadow: '0 1px 5px rgba(0,0,0,0.1)' }}
+//                             aria-label="Toggle layer control"
+//                         >
+//                             <Layers size={22} />
+//                         </button>
+
+//                         {isLayerPanelOpen && (
+//                             <div
+//                                 className={`
+//                                     absolute top-0 left-full ml-2 bg-white rounded-[4px] border-2 border-gray-300
+//                                     p-3 min-w-[120px] max-w-[150px]
+//                                     ${isMobile ? 'min-w-[120px]' : ''}
+//                                     shadow-lg
+//                                 `}
+//                                 style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}
+//                             >
+//                                 <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+//                                     <h3 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+//                                         Layers
+//                                     </h3>
+//                                     <button
+//                                         onClick={() => setIsLayerPanelOpen(false)}
+//                                         className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 transition-all duration-200"
+//                                     >
+//                                         <X size={16} strokeWidth={3} />
+//                                     </button>
+//                                 </div>
+
+//                                 {/* Overlay Section - Only Assets */}
+//                                 <div>
+//                                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Overlays</p>
+//                                     <div className="flex flex-col gap-1.5">
+//                                         {availableLayers.map((layer) => (
+//                                             <label
+//                                                 key={layer.id}
+//                                                 className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600 transition-colors group"
+//                                             >
+//                                                 <input
+//                                                     type="checkbox"
+//                                                     checked={activeLayers.includes(layer.id)}
+//                                                     onChange={() => handleLayerToggle(layer.id)}
+//                                                     className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer transition-all duration-200"
+//                                                 />
+//                                                 <span className="flex items-center gap-1.5">
+//                                                     {layer.name}
+//                                                 </span>
+//                                             </label>
+//                                         ))}
+//                                     </div>
+//                                 </div>
+
+//                                 {/* Base Map Section */}
+//                                 <div className="mt-2 pt-1 border-t border-gray-100">
+//                                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Base Map</p>
+//                                     <div className="flex flex-col gap-1.5">
+//                                         <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600 transition-colors">
+//                                             <input
+//                                                 type="radio"
+//                                                 name="baseLayer"
+//                                                 checked={baseLayer === 'streets'}
+//                                                 onChange={() => handleBaseLayerChange('streets')}
+//                                                 className="w-3.5 h-3.5 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+//                                             />
+//                                             <span className="flex items-center gap-1.5">Streets</span>
+//                                         </label>
+//                                         <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600 transition-colors">
+//                                             <input
+//                                                 type="radio"
+//                                                 name="baseLayer"
+//                                                 checked={baseLayer === 'satellite'}
+//                                                 onChange={() => handleBaseLayerChange('satellite')}
+//                                                 className="w-3.5 h-3.5 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+//                                             />
+//                                             <span className="flex items-center gap-1.5">Satellite</span>
+//                                         </label>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         )}
+//                     </div>
+//                 )}
+
+//                 {/* Divider Tag */}
+//                 <div
+//                     ref={tagRef}
+//                     className="absolute bottom-4 pointer-events-none"
+//                     style={{
+//                         left: "0px",
+//                         transform: "translateX(-50%)",
+//                         visibility: isDividerReady ? "visible" : "hidden",
+//                         zIndex: 400,
+//                     }}
+//                 >
+//                     <div className="flex items-center gap-2 bg-gray-900/80 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
+//                         <span>{yearLeft}</span>
+//                         <span className="text-gray-400">|</span>
+//                         <span>{yearRight}</span>
+//                     </div>
+//                 </div>
+
+//                 {/* Divider Line */}
+//                 <div
+//                     ref={dividerLineRef}
+//                     className="absolute top-0 bottom-0 pointer-events-none"
+//                     style={{
+//                         left: "0px",
+//                         width: "2px",
+//                         background: "rgba(59, 130, 246, 0.5)",
+//                         transform: "translateX(-50%)",
+//                         boxShadow: "0 0 10px rgba(59, 130, 246, 0.3)",
+//                         visibility: isDividerReady ? "visible" : "hidden",
+//                         zIndex: 399,
+//                     }}
+//                 />
+
+//                 {/* Loading State */}
+//                 {(loading || flyoversLoading || movementLoading) && (
+//                     <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm z-[500]">
+//                         <div className="flex flex-col items-center gap-2 bg-white px-5 py-4 rounded-xl shadow-lg border border-gray-200">
+//                             <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+//                             <p className="text-xs text-gray-500">
+//                                 {loading ? "Loading LULC data..." :
+//                                     movementLoading ? "Loading movement points..." :
+//                                         "Loading flyover data..."}
+//                             </p>
+//                         </div>
+//                     </div>
+//                 )}
+
+//                 {/* Error State */}
+//                 {(error || movementError) && (
+//                     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center gap-2 shadow-lg max-w-md">
+//                         <AlertTriangle size={16} className="flex-shrink-0" />
+//                         <span>{error || movementError}</span>
+//                     </div>
+//                 )}
+
+//                 {/* Regular Chart */}
+//                 {showChart && selectedPointForChart && selectedDetailForChart && (
+//                     <MovementPointsChart
+//                         pointData={selectedPointForChart}
+//                         detailData={selectedDetailForChart}
+//                         onClose={() => {
+//                             setShowChart(false);
+//                             setSelectedPointForChart(null);
+//                             setSelectedDetailForChart(null);
+//                         }}
+//                     />
+//                 )}
+
+//                 {/* Difference Chart */}
+//                 {showDiffChart && diffPointData && diffDetailData && (
+//                     <MovementDiffChart
+//                         pointData={diffPointData}
+//                         detailData={diffDetailData}
+//                         startDate={diffStartDate}
+//                         endDate={diffEndDate}
+//                         onClose={() => {
+//                             setShowDiffChart(false);
+//                             setDiffPointData(null);
+//                             setDiffDetailData(null);
+//                         }}
+//                     />
+//                 )}
+//             </div>
+//         </div>
+//     );
+// }
+
+
+
+
+
+
+
+
+// // src/components/LandUseLandCover.jsx
+// import { useEffect, useRef, useState, useCallback } from "react";
+// import L from "leaflet";
+// import "leaflet/dist/leaflet.css";
+// import "leaflet-side-by-side";
+// import { Loader2, AlertTriangle, Layers, X, Maximize, Minimize, CircleDot, ChevronDown, Calendar } from "lucide-react";
+// import { useFlyoverData } from "../hooks/useFlyoverData";
+// import { useMovementPoints } from "../hooks/useMovementPoints";
+// import {
+//     getFlyoverColor,
+//     getFlyoverDisplayName,
+//     makeFlyoverIcon,
+//     formatPointName,
+// } from "./map/mapHelpers";
+
+// import MovementPointsChart from "./MovementPointsChart";
+// import MovementDiffChart from "./MovementDiffChart";
+
+// const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+// const TILE_LAYER_URL = "https://mlinfomap.org/nhaiapi/tiles/{year}/{z}/{x}/{y}.png";
+
+// const DEFAULT_CENTER = [30.3, 76.7];
+// const DEFAULT_ZOOM = 10;
+// const MIN_ZOOM = 9;
+// const MAX_ZOOM = 22;
+
+// // LULC Classes for Legend
+// const LULC_CLASSES = [
+//     { color: "#055ac5", label: "Water" },
+//     { color: "#0b832a", label: "Trees" },
+//     { color: "#dae04e", label: "Crop" },
+//     { color: "#f14c40", label: "Builtup" },
+//     { color: "#ecfff8", label: "Bare Ground" },
+//     { color: "#99998f", label: "Rangeland" },
+// ];
+
+// function LULCLegend() {
+//     return (
+//         <div className="absolute bottom-3 right-3 z-[1500] bg-white/95 backdrop-blur-sm rounded-md shadow-md border border-gray-200 px-3 py-2 max-w-[180px]">
+//             <div className="text-[11px] font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+//                 Land Cover
+//             </div>
+//             <div className="flex flex-col gap-1">
+//                 {LULC_CLASSES.map((item) => (
+//                     <div key={item.label} className="flex items-center gap-2">
+//                         <span
+//                             className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-200"
+//                             style={{ backgroundColor: item.color }}
+//                         />
+//                         <span className="text-[10px] text-gray-600 leading-tight">{item.label}</span>
+//                     </div>
+//                 ))}
+//             </div>
+//         </div>
+//     );
+// }
+
+// function YearSelect({ label, value, onChange, disabledYears = [] }) {
+//     return (
+//         <div className="flex items-center gap-2">
+//             <label className="text-sm text-black-700 font-medium">{label}</label>
+//             <select
+//                 value={value}
+//                 onChange={(e) => onChange(Number(e.target.value))}
+//                 className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+//             >
+//                 {YEARS.map((y) => {
+//                     const isDisabled = disabledYears.includes(y);
+//                     return (
+//                         <option
+//                             key={y}
+//                             value={y}
+//                             disabled={isDisabled}
+//                             className={isDisabled ? 'text-gray-400 bg-gray-100' : 'text-gray-900'}
+//                         >
+//                             {y} {isDisabled ? '' : ''}
+//                         </option>
+//                     );
+//                 })}
+//             </select>
+//         </div>
+//     );
+// }
+
+// function FullscreenButton({ isFullscreen, onToggle }) {
+//     return (
+//         <button
+//             onClick={onToggle}
+//             className={`flex items-center justify-center w-[30px] h-[30px] bg-white rounded-md shadow-md border border-gray-200 transition-all duration-200 hover:bg-gray-50 hover:shadow-lg ${isFullscreen ? 'bg-blue-50 border-blue-300 text-blue-600' : 'text-gray-700'}`}
+//             aria-label="Toggle fullscreen"
+//         >
+//             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+//         </button>
+//     );
+// }
+
+// // Layer Selector Dropdown - Reduced size
+// function LayerSelector({ selectedLayer, onLayerChange }) {
+//     const [isOpen, setIsOpen] = useState(false);
+//     const dropdownRef = useRef(null);
+
+//     useEffect(() => {
+//         const handleClickOutside = (event) => {
+//             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+//                 setIsOpen(false);
+//             }
+//         };
+//         document.addEventListener('mousedown', handleClickOutside);
+//         return () => document.removeEventListener('mousedown', handleClickOutside);
+//     }, []);
+
+//     const getLayerLabel = (layer) => {
+//         switch (layer) {
+//             case 'velocity': return 'Velocity';
+//             case 'difference': return 'Difference';
+//             default: return 'Velocity';
+//         }
+//     };
+
+//     return (
+//         <div className="relative flex items-center gap-1.5" ref={dropdownRef}>
+//             <span className="text-xs font-medium text-gray-700">Layer:</span>
+//             <button
+//                 onClick={() => setIsOpen(!isOpen)}
+//                 className={`flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 border min-w-[90px] h-[28px] ${selectedLayer === 'difference'
+//                     ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+//                     : 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
+//                     }`}
+//             >
+//                 <span>{getLayerLabel(selectedLayer)}</span>
+//                 <ChevronDown size={12} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+//             </button>
+
+//             {isOpen && (
+//                 <div className="absolute top-full left-[45px] mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1.5 z-[1600] min-w-[120px]">
+//                     <button
+//                         onClick={() => {
+//                             onLayerChange('velocity');
+//                             setIsOpen(false);
+//                         }}
+//                         className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${selectedLayer === 'velocity' ? 'bg-green-50 text-green-700 font-medium' : 'text-gray-700'
+//                             }`}
+//                     >
+//                         Velocity
+//                     </button>
+//                     <button
+//                         onClick={() => {
+//                             onLayerChange('difference');
+//                             setIsOpen(false);
+//                         }}
+//                         className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${selectedLayer === 'difference' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+//                             }`}
+//                     >
+//                         Difference
+//                     </button>
+//                 </div>
+//             )}
+//         </div>
+//     );
+// }
+
+
+// // Updated DateRangeSelector component with higher z-index
+// // Updated DateRangeSelector component with better sizing
+// function DateRangeSelector({
+//     availableDates = [],
+//     startDate,
+//     endDate,
+//     onStartDateChange,
+//     onEndDateChange,
+//     compact = false
+// }) {
+//     const [isStartOpen, setIsStartOpen] = useState(false);
+//     const [isEndOpen, setIsEndOpen] = useState(false);
+//     const startRef = useRef(null);
+//     const endRef = useRef(null);
+
+//     useEffect(() => {
+//         const handleClickOutside = (event) => {
+//             if (startRef.current && !startRef.current.contains(event.target)) {
+//                 setIsStartOpen(false);
+//             }
+//             if (endRef.current && !endRef.current.contains(event.target)) {
+//                 setIsEndOpen(false);
+//             }
+//         };
+//         document.addEventListener('mousedown', handleClickOutside);
+//         return () => document.removeEventListener('mousedown', handleClickOutside);
+//     }, []);
+
+//     const formatDisplayDate = (dateStr) => {
+//         if (!dateStr) return 'Select Date';
+//         const parts = dateStr.split('-');
+//         return `${parts[1]}/${parts[2]}/${parts[0]}`;
+//     };
+
+//     // Compact version for inline display - outer container matches LayerSelector height
+//     return (
+//         <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 rounded-md border border-blue-200 shadow-sm relative h-[34px]">
+//             {/* Start Date */}
+//             <div className="relative" ref={startRef}>
+//                 <button
+//                     onClick={() => setIsStartOpen(!isStartOpen)}
+//                     className="flex items-center justify-between gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:border-blue-400 transition-colors text-xs min-w-[70px]"
+//                 >
+//                     <span className={startDate ? 'text-gray-800' : 'text-gray-400'}>
+//                         {startDate ? formatDisplayDate(startDate) : 'Start'}
+//                     </span>
+//                     <ChevronDown size={12} className={`text-gray-400 transition-transform ${isStartOpen ? 'rotate-180' : ''}`} />
+//                 </button>
+//                 {isStartOpen && availableDates.length > 0 && (
+//                     <div
+//                         className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto min-w-[110px]"
+//                         style={{
+//                             zIndex: 9999,
+//                             position: 'absolute',
+//                         }}
+//                     >
+//                         {availableDates.map((date) => (
+//                             <button
+//                                 key={date}
+//                                 onClick={() => {
+//                                     onStartDateChange(date);
+//                                     setIsStartOpen(false);
+//                                     if (!endDate || endDate < date) {
+//                                         onEndDateChange(date);
+//                                     }
+//                                 }}
+//                                 className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${startDate === date ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700'
+//                                     }`}
+//                             >
+//                                 {formatDisplayDate(date)}
+//                             </button>
+//                         ))}
+//                     </div>
+//                 )}
+//             </div>
+
+//             <span className="text-gray-400 text-xs">→</span>
+
+//             {/* End Date */}
+//             <div className="relative" ref={endRef}>
+//                 <button
+//                     onClick={() => setIsEndOpen(!isEndOpen)}
+//                     className="flex items-center justify-between gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:border-blue-400 transition-colors text-xs min-w-[70px]"
+//                 >
+//                     <span className={endDate ? 'text-gray-800' : 'text-gray-400'}>
+//                         {endDate ? formatDisplayDate(endDate) : 'End'}
+//                     </span>
+//                     <ChevronDown size={12} className={`text-gray-400 transition-transform ${isEndOpen ? 'rotate-180' : ''}`} />
+//                 </button>
+//                 {isEndOpen && availableDates.length > 0 && (
+//                     <div
+//                         className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto min-w-[110px]"
+//                         style={{
+//                             zIndex: 9999,
+//                             position: 'absolute',
+//                         }}
+//                     >
+//                         {availableDates
+//                             .filter(date => !startDate || date >= startDate)
+//                             .map((date) => (
+//                                 <button
+//                                     key={date}
+//                                     onClick={() => {
+//                                         onEndDateChange(date);
+//                                         setIsEndOpen(false);
+//                                     }}
+//                                     className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${endDate === date ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700'
+//                                         }`}
+//                                 >
+//                                     {formatDisplayDate(date)}
+//                                 </button>
+//                             ))}
+//                     </div>
+//                 )}
+//             </div>
+//         </div>
+//     );
+// }
+
+
+// export default function LandUseLandCover({
+//     mapCenter = DEFAULT_CENTER,
+//     mapZoom = DEFAULT_ZOOM,
+//     defaultLeftYear = YEARS[0],
+//     defaultRightYear = YEARS[YEARS.length - 1],
+//     className = "",
+//     isActive = true,
+// }) {
+//     const mapContainerRef = useRef(null);
+//     const fullscreenContainerRef = useRef(null);
+//     const mapRef = useRef(null);
+//     const leftLayerRef = useRef(null);
+//     const rightLayerRef = useRef(null);
+//     const sideBySideRef = useRef(null);
+//     const streetLayerRef = useRef(null);
+//     const satelliteLayerRef = useRef(null);
+//     const flyoverLayersRef = useRef([]);
+//     const flyoverMarkersRef = useRef([]);
+//     const movementMarkersRef = useRef([]);
+
+//     // Chart states
+//     const [showChart, setShowChart] = useState(false);
+//     const [selectedPointForChart, setSelectedPointForChart] = useState(null);
+//     const [selectedDetailForChart, setSelectedDetailForChart] = useState(null);
+
+//     // Diff Chart states
+//     const [showDiffChart, setShowDiffChart] = useState(false);
+//     const [diffPointData, setDiffPointData] = useState(null);
+//     const [diffDetailData, setDiffDetailData] = useState(null);
+//     const [diffStartDate, setDiffStartDate] = useState('');
+//     const [diffEndDate, setDiffEndDate] = useState('');
+
+//     // Layer selection: 'velocity' or 'difference'
+//     const [selectedLayer, setSelectedLayer] = useState('velocity');
+
+//     const tagRef = useRef(null);
+//     const dividerLineRef = useRef(null);
+//     const rafIdRef = useRef(null);
+//     const debounceRef = useRef(null);
+//     const dividerReadyTimeoutRef = useRef(null);
+//     const resizeObserverRef = useRef(null);
+//     const isMountedRef = useRef(true);
+//     const isMapReadyRef = useRef(false);
+//     const hasFitBoundsRef = useRef(false);
+//     const requestIdRef = useRef(0);
+
+//     const [yearLeft, setYearLeft] = useState(defaultLeftYear);
+//     const [yearRight, setYearRight] = useState(defaultRightYear);
+//     const [loading, setLoading] = useState(true);
+//     const [error, setError] = useState(null);
+//     const [isDividerReady, setIsDividerReady] = useState(false);
+//     const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+//     const [isFullscreen, setIsFullscreen] = useState(false);
+//     const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false);
+//     const [activeLayers, setActiveLayers] = useState(['flyover', 'movement']); // Changed: Add movement by default
+//     const [baseLayer, setBaseLayer] = useState('streets');
+
+//     const { flyovers, loading: flyoversLoading } = useFlyoverData();
+
+//     const {
+//         points: movementPoints,
+//         loading: movementLoading,
+//         total: movementTotal,
+//         error: movementError,
+//         availableDates,
+//         selectPoint,
+//         selectedPointData,
+//         loadingDetail,
+//     } = useMovementPoints();
+
+//     // Set default dates when available
+//     useEffect(() => {
+//         if (availableDates && availableDates.length > 0 && !diffStartDate && !diffEndDate) {
+//             setDiffStartDate(availableDates[0]);
+//             setDiffEndDate(availableDates[availableDates.length - 1]);
+//         }
+//     }, [availableDates]);
+
+//     // Log the data to verify it's working
+//     useEffect(() => {
+//         if (movementPoints && movementPoints.length > 0) {
+//             console.log(`✅ Movement Points loaded: ${movementPoints.length} points`);
+//             console.log('📊 Sample point:', movementPoints[0]);
+//         }
+//         if (movementError) {
+//             console.error('❌ Movement Points Error:', movementError);
+//         }
+//         if (availableDates && availableDates.length > 0) {
+//             console.log('📅 Available dates:', availableDates);
+//         }
+//     }, [movementPoints, movementError, availableDates]);
+
+//     // Handle layer change (Velocity or Difference)
+//     const handleLayerChange = useCallback((layer) => {
+//         console.log('🔄 Layer changed to:', layer);
+//         setSelectedLayer(layer);
+
+//         // Update active layers based on selection
+//         if (layer === 'velocity') {
+//             setActiveLayers(prev => {
+//                 const newLayers = prev.filter(id => id !== 'difference');
+//                 if (!newLayers.includes('movement')) {
+//                     newLayers.push('movement');
+//                 }
+//                 return newLayers;
+//             });
+//             // Clear diff chart
+//             setShowDiffChart(false);
+//             setDiffPointData(null);
+//             setDiffDetailData(null);
+//         } else if (layer === 'difference') {
+//             setActiveLayers(prev => {
+//                 const newLayers = prev.filter(id => id !== 'movement');
+//                 if (!newLayers.includes('difference')) {
+//                     newLayers.push('difference');
+//                 }
+//                 return newLayers;
+//             });
+//         }
+//     }, []);
+
+//     // Add movement point circles to map with hover and click
+//     const addMovementPointsToMap = useCallback((map, points) => {
+//         if (!points || points.length === 0) return;
+
+//         // Clear existing markers
+//         movementMarkersRef.current.forEach(marker => {
+//             if (map.hasLayer(marker)) {
+//                 map.removeLayer(marker);
+//             }
+//         });
+//         movementMarkersRef.current = [];
+
+//         points.forEach((feature) => {
+//             const { id, longitude, latitude, velocity, coherence } = feature.data;
+
+//             const circle = L.circle([latitude, longitude], {
+//                 pane: 'movementPane',
+//                 radius: 4,
+//                 fillColor: '#8a0b68',
+//                 color: '#0d0101',
+//                 weight: 2,
+//                 opacity: 1,
+//                 fillOpacity: 0.8,
+//             });
+
+//             circle.on('mouseover', function (e) {
+//                 this.setStyle({
+//                     fillColor: '#ff6b6b',
+//                     color: '#ff0000',
+//                     weight: 4,
+//                     fillOpacity: 0.9,
+//                 });
+
+//                 // Show tooltip ONLY when velocity layer is selected
+//                 if (selectedLayer === 'velocity') {
+//                     const tooltipContent = `
+//                     <div style="padding: 2px 6px; font-size: 12px; font-weight: 600; line-height: 1.3;">
+//                         Point ID: ${id}<br/>
+//                         Velocity: ${velocity} mm/yr
+//                     </div>
+//                 `;
+
+//                     this.bindTooltip(tooltipContent, {
+//                         permanent: false,
+//                         direction: 'top',
+//                         offset: [0, -10],
+//                         className: 'velocity-tooltip',
+//                     }).openTooltip();
+//                 } else {
+//                     // Close any existing tooltip when in difference mode
+//                     this.closeTooltip();
+//                 }
+//             });
+
+//             circle.on('mouseout', function (e) {
+//                 this.setStyle({
+//                     fillColor: '#8a0b68',
+//                     color: '#0d0101',
+//                     weight: 2,
+//                     fillOpacity: 0.8,
+//                 });
+//                 this.closeTooltip();
+//             });
+
+//             circle.on('click', async function (e) {
+//                 try {
+//                     this.setStyle({
+//                         fillColor: '#ffd93d',
+//                         color: '#f59f00',
+//                         weight: 4,
+//                     });
+
+//                     const detailData = await selectPoint(id);
+
+//                     if (detailData) {
+//                         if (selectedLayer === 'difference' && diffStartDate && diffEndDate) {
+//                             // Show difference chart
+//                             setDiffPointData(feature);
+//                             setDiffDetailData(detailData);
+//                             setShowDiffChart(true);
+//                         } else {
+//                             // Show regular movement chart
+//                             setSelectedPointForChart(feature);
+//                             setSelectedDetailForChart(detailData);
+//                             setShowChart(true);
+//                         }
+
+//                         this.setStyle({
+//                             fillColor: '#8a0b68',
+//                             color: '#0d0101',
+//                             weight: 2,
+//                         });
+//                     }
+//                 } catch (err) {
+//                     console.error('Error fetching point details:', err);
+//                     this.setStyle({
+//                         fillColor: '#8a0b68',
+//                         color: '#0d0101',
+//                         weight: 2,
+//                     });
+//                 }
+//             });
+
+//             movementMarkersRef.current.push(circle);
+//         });
+
+//         // Always show markers
+//         movementMarkersRef.current.forEach(marker => {
+//             marker.addTo(map);
+//         });
+
+//         console.log(`✅ Added ${movementMarkersRef.current.length} movement point circles to map`);
+//     }, [selectedLayer, selectPoint, diffStartDate, diffEndDate]);
+
+//     // Update movement points visibility
+//     const updateMovementVisibility = useCallback(() => {
+//         if (!mapRef.current) return;
+
+//         // Always show movement markers
+//         movementMarkersRef.current.forEach(marker => {
+//             if (!mapRef.current.hasLayer(marker)) {
+//                 marker.addTo(mapRef.current);
+//             }
+//         });
+//     }, []);
+
+//     // Load movement points when data arrives
+//     useEffect(() => {
+//         if (!mapRef.current || !isActive) return;
+//         if (!movementPoints || movementPoints.length === 0) return;
+
+//         setTimeout(() => {
+//             try {
+//                 addMovementPointsToMap(mapRef.current, movementPoints);
+//             } catch (err) {
+//                 console.error("[LULC] Error adding movement points:", err);
+//             }
+//         }, 500);
+//     }, [movementPoints, isActive, addMovementPointsToMap]);
+
+//     // Update points when layer changes (to update tooltips)
+//     useEffect(() => {
+//         if (mapRef.current && movementPoints && movementPoints.length > 0) {
+//             addMovementPointsToMap(mapRef.current, movementPoints);
+//         }
+//     }, [selectedLayer, diffStartDate, diffEndDate, addMovementPointsToMap]);
+
+//     const availableLayers = [
+//         { id: 'flyover', name: 'Assets', color: '#3B82F6', type: 'overlay' },
+//     ];
+
+//     // Track mobile breakpoint
+//     useEffect(() => {
+//         const handleResize = () => setIsMobile(window.innerWidth <= 1024);
+//         window.addEventListener("resize", handleResize);
+//         return () => window.removeEventListener("resize", handleResize);
+//     }, []);
+
+
+
+//     // ---- Remove default browser focus outline on Leaflet interactive shapes ----
+//     useEffect(() => {
+//         const style = document.createElement('style');
+//         style.textContent = `
+//         .leaflet-interactive:focus,
+//         .leaflet-interactive:focus-visible {
+//             outline: none !important;
+//         }
+//         path.leaflet-interactive:focus {
+//             outline: none !important;
+//         }
+//     `;
+//         document.head.appendChild(style);
+//         return () => document.head.removeChild(style);
+//     }, []);
+
+//     // Fullscreen handler
+//     useEffect(() => {
+//         const handleFullscreenChange = () => {
+//             setIsFullscreen(!!document.fullscreenElement);
+//             setTimeout(() => {
+//                 try {
+//                     if (mapRef.current && mapContainerRef.current) {
+//                         if (document.contains(mapContainerRef.current)) {
+//                             mapRef.current.invalidateSize();
+//                         }
+//                     }
+//                 } catch (err) {
+//                     console.error("[LULC] Error during fullscreen change:", err);
+//                 }
+//             }, 200);
+//         };
+//         document.addEventListener("fullscreenchange", handleFullscreenChange);
+//         return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+//     }, []);
+
+//     // Update visibility when activeLayers change (flyover only)
+//     useEffect(() => {
+//         if (mapRef.current) {
+//             updateLayerVisibility();
+//         }
+//     }, [activeLayers]);
+
+//     // ---- Divider handlers ----
+//     const handleDividerMove = useCallback(() => {
+//         if (rafIdRef.current) return;
+//         rafIdRef.current = requestAnimationFrame(() => {
+//             rafIdRef.current = null;
+//             if (!sideBySideRef.current) return;
+//             const pos = sideBySideRef.current.getPosition();
+//             const px = `${pos}px`;
+//             if (tagRef.current) tagRef.current.style.left = px;
+//             if (dividerLineRef.current) dividerLineRef.current.style.left = px;
+//         });
+//     }, []);
+
+//     // ---- Update layer visibility (flyovers only) ----
+//     const updateLayerVisibility = useCallback(() => {
+//         if (!mapRef.current) return;
+
+//         if (activeLayers.includes('flyover')) {
+//             flyoverLayersRef.current.forEach(layer => {
+//                 if (!mapRef.current.hasLayer(layer)) {
+//                     mapRef.current.addLayer(layer);
+//                 }
+//             });
+//             flyoverMarkersRef.current.forEach(marker => {
+//                 if (!mapRef.current.hasLayer(marker)) {
+//                     mapRef.current.addLayer(marker);
+//                 }
+//             });
+//         } else {
+//             flyoverLayersRef.current.forEach(layer => {
+//                 if (mapRef.current.hasLayer(layer)) {
+//                     mapRef.current.removeLayer(layer);
+//                 }
+//             });
+//             flyoverMarkersRef.current.forEach(marker => {
+//                 if (mapRef.current.hasLayer(marker)) {
+//                     mapRef.current.removeLayer(marker);
+//                 }
+//             });
+//         }
+//     }, [activeLayers]);
+
+//     // ---- Handle layer toggling ----
+//     const handleLayerToggle = useCallback((layerId) => {
+//         setActiveLayers(prev => {
+//             if (prev.includes(layerId)) {
+//                 return prev.filter(id => id !== layerId);
+//             } else {
+//                 return [...prev, layerId];
+//             }
+//         });
+//     }, []);
+
+//     // ---- Handle base layer change ----
+//     const handleBaseLayerChange = useCallback((layerType) => {
+//         setBaseLayer(layerType);
+//         if (!mapRef.current) return;
+
+//         try {
+//             if (layerType === 'streets') {
+//                 if (satelliteLayerRef.current && mapRef.current.hasLayer(satelliteLayerRef.current)) {
+//                     mapRef.current.removeLayer(satelliteLayerRef.current);
+//                 }
+//                 if (streetLayerRef.current && !mapRef.current.hasLayer(streetLayerRef.current)) {
+//                     mapRef.current.addLayer(streetLayerRef.current);
+//                 }
+//             } else if (layerType === 'satellite') {
+//                 if (streetLayerRef.current && mapRef.current.hasLayer(streetLayerRef.current)) {
+//                     mapRef.current.removeLayer(streetLayerRef.current);
+//                 }
+//                 if (satelliteLayerRef.current && !mapRef.current.hasLayer(satelliteLayerRef.current)) {
+//                     mapRef.current.addLayer(satelliteLayerRef.current);
+//                 }
+//             }
+
+//             const leftLayer = leftLayerRef.current;
+//             const rightLayer = rightLayerRef.current;
+//             if (leftLayer && mapRef.current.hasLayer(leftLayer)) {
+//                 leftLayer.setZIndex(10);
+//             }
+//             if (rightLayer && mapRef.current.hasLayer(rightLayer)) {
+//                 rightLayer.setZIndex(10);
+//             }
+
+//             if (sideBySideRef.current && typeof sideBySideRef.current._updateClip === 'function') {
+//                 sideBySideRef.current._updateClip();
+//             }
+//         } catch (err) {
+//             console.error("[LULC] Error switching base layer:", err);
+//         }
+//     }, []);
+
+//     // ---- Toggle fullscreen ----
+//     const toggleFullscreen = useCallback(() => {
+//         try {
+//             const container = fullscreenContainerRef.current;
+//             if (!document.fullscreenElement) {
+//                 if (container?.requestFullscreen) {
+//                     container.requestFullscreen();
+//                 }
+//             } else {
+//                 if (document.exitFullscreen) {
+//                     document.exitFullscreen();
+//                 }
+//             }
+//         } catch (err) {
+//             console.error("[LULC] Error toggling fullscreen:", err);
+//         }
+//     }, []);
+
+//     // ---- Create tile layers for side-by-side comparison ----
+//     const createLayers = useCallback(() => {
+//         if (!mapRef.current || !isActive) {
+//             return;
+//         }
+
+//         if (debounceRef.current) clearTimeout(debounceRef.current);
+
+//         const requestId = ++requestIdRef.current;
+
+//         debounceRef.current = setTimeout(() => {
+//             setLoading(true);
+//             setError(null);
+
+//             try {
+//                 const map = mapRef.current;
+
+//                 if (sideBySideRef.current) {
+//                     map.removeControl(sideBySideRef.current);
+//                     sideBySideRef.current = null;
+//                 }
+//                 if (leftLayerRef.current && map.hasLayer(leftLayerRef.current)) {
+//                     map.removeLayer(leftLayerRef.current);
+//                 }
+//                 if (rightLayerRef.current && map.hasLayer(rightLayerRef.current)) {
+//                     map.removeLayer(rightLayerRef.current);
+//                 }
+
+//                 map.invalidateSize();
+
+//                 const leftUrl = TILE_LAYER_URL.replace('{year}', yearLeft);
+//                 const leftLayer = L.tileLayer(leftUrl, {
+//                     tileSize: 256,
+//                     minZoom: MIN_ZOOM,
+//                     maxZoom: MAX_ZOOM,
+//                     crossOrigin: true,
+//                     opacity: 1,
+//                     zIndex: 10,
+//                 });
+
+//                 const rightUrl = TILE_LAYER_URL.replace('{year}', yearRight);
+//                 const rightLayer = L.tileLayer(rightUrl, {
+//                     tileSize: 256,
+//                     minZoom: MIN_ZOOM,
+//                     maxZoom: MAX_ZOOM,
+//                     crossOrigin: true,
+//                     opacity: 1,
+//                     zIndex: 10,
+//                 });
+
+//                 leftLayer.addTo(map);
+//                 rightLayer.addTo(map);
+
+//                 sideBySideRef.current = L.control
+//                     .sideBySide([leftLayer], [rightLayer])
+//                     .addTo(map);
+//                 sideBySideRef.current.setPosition(0.5);
+//                 sideBySideRef.current.on("dividermove", handleDividerMove);
+
+//                 leftLayerRef.current = leftLayer;
+//                 rightLayerRef.current = rightLayer;
+
+//                 requestAnimationFrame(() => {
+//                     requestAnimationFrame(() => {
+//                         if (requestId !== requestIdRef.current) return;
+//                         handleDividerMove();
+//                     });
+//                 });
+
+//                 if (!hasFitBoundsRef.current) {
+//                     const bounds = map.getBounds();
+//                     if (bounds.isValid()) {
+//                         map.fitBounds(bounds);
+//                         hasFitBoundsRef.current = true;
+//                     }
+//                 }
+
+//                 if (dividerReadyTimeoutRef.current) clearTimeout(dividerReadyTimeoutRef.current);
+//                 dividerReadyTimeoutRef.current = setTimeout(() => {
+//                     if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+
+//                     const pos = sideBySideRef.current?.getPosition() ?? (mapContainerRef.current?.clientWidth ?? 0) / 2;
+
+//                     if (tagRef.current) tagRef.current.style.left = `${pos}px`;
+//                     if (dividerLineRef.current) dividerLineRef.current.style.left = `${pos}px`;
+
+//                     setIsDividerReady(true);
+//                     setLoading(false);
+//                 }, 100);
+
+//                 map.invalidateSize();
+
+//             } catch (err) {
+//                 console.error("Error creating tile layers:", err);
+//                 if (isMountedRef.current && requestId === requestIdRef.current) {
+//                     setError(err?.message || "Failed to load tile layers.");
+//                     setLoading(false);
+//                 }
+//             }
+//         }, 100);
+
+//         return () => {
+//             clearTimeout(debounceRef.current);
+//         };
+//     }, [isActive, yearLeft, yearRight, handleDividerMove]);
+
+//     // ---- Add flyover layers ----
+//     const addFlyoverLayers = useCallback((map) => {
+//         if (!flyovers || flyovers.length === 0) return;
+
+//         try {
+//             requestAnimationFrame(() => {
+//                 flyoverLayersRef.current.forEach(layer => {
+//                     try {
+//                         if (map.hasLayer(layer)) {
+//                             map.removeLayer(layer);
+//                         }
+//                     } catch (err) {
+//                         console.error("[LULC] Error removing flyover layer:", err);
+//                     }
+//                 });
+//                 flyoverLayersRef.current = [];
+
+//                 flyoverMarkersRef.current.forEach(marker => {
+//                     try {
+//                         if (map.hasLayer(marker)) {
+//                             map.removeLayer(marker);
+//                         }
+//                     } catch (err) {
+//                         console.error("[LULC] Error removing flyover marker:", err);
+//                     }
+//                 });
+//                 flyoverMarkersRef.current = [];
+
+//                 flyovers.forEach((flyover, index) => {
+//                     try {
+//                         const color = getFlyoverColor(index);
+//                         const displayName = getFlyoverDisplayName(flyover.type, index);
+
+//                         if (flyover.geojson) {
+//                             try {
+//                                 const layer = L.geoJSON(flyover.geojson, {
+//                                     style: {
+//                                         color: color,
+//                                         weight: 3,
+//                                         opacity: 0.8,
+//                                         fillColor: color,
+//                                         fillOpacity: 0.2,
+//                                     },
+//                                 });
+//                                 flyoverLayersRef.current.push(layer);
+//                             } catch (err) {
+//                                 console.error(`[LULC] Error adding flyover layer for ${displayName}:`, err);
+//                             }
+//                         }
+
+//                         if (flyover.namedPoints && flyover.namedPoints.length > 0) {
+//                             flyover.namedPoints.forEach((point) => {
+//                                 try {
+//                                     const pointName = formatPointName(point.name);
+//                                     const icon = makeFlyoverIcon({
+//                                         color: color,
+//                                         labelText: pointName,
+//                                         detailed: false,
+//                                         name: pointName,
+//                                         detailFields: [],
+//                                     });
+
+//                                     const marker = L.marker(point.latlng, {
+//                                         icon: icon,
+//                                         riseOnHover: true,
+//                                         zIndexOffset: 100,
+//                                     });
+
+//                                     const popupContent = `
+//                                         <div style="padding: 8px; font-family: Arial, sans-serif;">
+//                                             <h4 style="margin: 0 0 4px 0; color: ${color};">${pointName}</h4>
+//                                             ${point.chainage ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Chainage:</strong> ${point.chainage}</p>` : ''}
+//                                             ${point.description ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Type:</strong> ${point.description}</p>` : ''}
+//                                             ${point.length ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Length:</strong> ${point.length}</p>` : ''}
+//                                             ${point.detail ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Structure:</strong> ${point.detail}</p>` : ''}
+//                                         </div>
+//                                     `;
+
+//                                     marker.bindPopup(popupContent, {
+//                                         maxWidth: 300,
+//                                         autoPan: true,
+//                                     });
+
+//                                     flyoverMarkersRef.current.push(marker);
+//                                 } catch (err) {
+//                                     console.error(`[LULC] Error adding marker for ${point.name}:`, err);
+//                                 }
+//                             });
+//                         }
+//                     } catch (err) {
+//                         console.error(`[LULC] Error processing flyover ${index}:`, err);
+//                     }
+//                 });
+
+//                 updateLayerVisibility();
+//             });
+//         } catch (err) {
+//             console.error("[LULC] Error in addFlyoverLayers:", err);
+//         }
+//     }, [flyovers, updateLayerVisibility]);
+
+//     // ---- Initialize map ----
+//     useEffect(() => {
+//         isMountedRef.current = true;
+//         if (mapRef.current || !mapContainerRef.current) return;
+
+//         try {
+//             const map = L.map(mapContainerRef.current, {
+//                 center: mapCenter,
+//                 zoom: DEFAULT_ZOOM,
+//                 minZoom: MIN_ZOOM,
+//                 maxZoom: MAX_ZOOM,
+//                 zoomControl: true,
+//                 attributionControl: false,
+//             });
+
+//             const streetLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+//                 subdomains: ["mt0", "mt1", "mt2", "mt3"],
+//                 maxZoom: 25,
+//                 attribution: "",
+//                 zIndex: 1,
+//             });
+
+//             const satelliteLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+//                 subdomains: ["mt0", "mt1", "mt2", "mt3"],
+//                 maxZoom: 25,
+//                 attribution: "",
+//                 zIndex: 1,
+//             });
+
+//             streetLayerRef.current = streetLayer;
+//             satelliteLayerRef.current = satelliteLayer;
+
+//             streetLayer.addTo(map);
+
+//             L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
+
+//             mapRef.current = map;
+//             isMapReadyRef.current = true;
+
+//             map.createPane('movementPane');
+//             map.getPane('movementPane').style.zIndex = 550;
+//             map.getPane('movementPane').style.pointerEvents = 'auto';
+
+//             const popupPane = map.getPane('popupPane');
+//             const mapPaneEl = map.getPane('mapPane');
+
+//             if (popupPane && mapPaneEl && popupPane.parentNode === mapPaneEl) {
+//                 map.getContainer().appendChild(popupPane);
+//                 popupPane.style.zIndex = '1400';
+//                 popupPane.style.pointerEvents = 'none';
+
+//                 const syncPopupPanePosition = () => {
+//                     if (popupPane && mapPaneEl) {
+//                         popupPane.style.transform = mapPaneEl.style.transform;
+//                     }
+//                 };
+//                 map.on('move zoom viewreset', syncPopupPanePosition);
+//                 syncPopupPanePosition();
+//             }
+
+//             if (typeof ResizeObserver !== "undefined") {
+//                 resizeObserverRef.current = new ResizeObserver(() => {
+//                     try {
+//                         if (mapRef.current && mapContainerRef.current) {
+//                             if (document.contains(mapContainerRef.current)) {
+//                                 mapRef.current.invalidateSize();
+//                             }
+//                         }
+//                     } catch (err) {
+//                         console.error("[LULC] Error in resize observer:", err);
+//                     }
+//                 });
+//                 resizeObserverRef.current.observe(mapContainerRef.current);
+//             }
+
+//             if (flyovers && flyovers.length > 0) {
+//                 setTimeout(() => {
+//                     try {
+//                         addFlyoverLayers(map);
+//                     } catch (err) {
+//                         console.error("[LULC] Error adding flyover layers:", err);
+//                     }
+//                 }, 300);
+//             }
+
+//             setTimeout(() => {
+//                 createLayers();
+//             }, 200);
+
+//             return () => {
+//                 isMountedRef.current = false;
+//                 if (debounceRef.current) clearTimeout(debounceRef.current);
+//                 if (dividerReadyTimeoutRef.current) clearTimeout(dividerReadyTimeoutRef.current);
+//                 if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+//                 resizeObserverRef.current?.disconnect();
+//                 sideBySideRef.current = null;
+//                 leftLayerRef.current = null;
+//                 rightLayerRef.current = null;
+//                 if (mapRef.current) {
+//                     try {
+//                         mapRef.current.remove();
+//                         mapRef.current = null;
+//                     } catch (err) {
+//                         console.error("[LULC] Error removing map:", err);
+//                     }
+//                 }
+//                 isMapReadyRef.current = false;
+//             };
+
+//         } catch (err) {
+//             console.error("[LULC] Error initializing map:", err);
+//             setError("Failed to initialize map. Please try again.");
+//             setLoading(false);
+//         }
+//     }, []);
+
+//     // ---- Add flyovers when data changes ----
+//     useEffect(() => {
+//         if (!mapRef.current || !isActive) return;
+//         if (!flyovers || flyovers.length === 0) return;
+
+//         setTimeout(() => {
+//             try {
+//                 addFlyoverLayers(mapRef.current);
+//             } catch (err) {
+//                 console.error("[LULC] Error adding flyover layers:", err);
+//             }
+//         }, 500);
+//     }, [flyovers, isActive, addFlyoverLayers]);
+
+//     // ---- Recreate layers when year changes ----
+//     useEffect(() => {
+//         if (!mapRef.current || !isActive) return;
+//         createLayers();
+//     }, [yearLeft, yearRight, isActive, createLayers]);
+
+//     // ---- Remove layers when inactive ----
+//     useEffect(() => {
+//         if (!mapRef.current) return;
+
+//         if (!isActive) {
+//             if (sideBySideRef.current) {
+//                 mapRef.current.removeControl(sideBySideRef.current);
+//                 sideBySideRef.current = null;
+//             }
+//             if (leftLayerRef.current && mapRef.current.hasLayer(leftLayerRef.current)) {
+//                 mapRef.current.removeLayer(leftLayerRef.current);
+//                 leftLayerRef.current = null;
+//             }
+//             if (rightLayerRef.current && mapRef.current.hasLayer(rightLayerRef.current)) {
+//                 mapRef.current.removeLayer(rightLayerRef.current);
+//                 rightLayerRef.current = null;
+//             }
+//             setIsDividerReady(false);
+//         }
+//     }, [isActive]);
+
+//     // ---- Force resize when active ----
+//     useEffect(() => {
+//         if (!isActive || !mapRef.current || !mapContainerRef.current) return;
+
+//         const raf = requestAnimationFrame(() => {
+//             try {
+//                 if (mapRef.current && mapContainerRef.current) {
+//                     if (document.contains(mapContainerRef.current)) {
+//                         mapRef.current.invalidateSize();
+//                     }
+//                 }
+//             } catch (err) {
+//                 console.error("[LULC] Error invalidating size on active:", err);
+//             }
+//         });
+
+//         return () => cancelAnimationFrame(raf);
+//     }, [isActive]);
+
+//     // Check if difference should be shown
+//     const showDifferenceUI = selectedLayer === 'difference';
+
+//     return (
+//         <div className={`flex flex-col h-full w-full ${className}`} ref={fullscreenContainerRef} style={{ background: '#ffffff', paddingTop: isFullscreen ? '10px' : '0px', }}>
+//             <div
+//                 className="flex flex-wrap items-center justify-between gap-3 mb-2 px-3 py-2 rounded-lg relative z-[2000]"
+//                 style={{
+//                     background: 'linear-gradient(135deg, #e0e7ff 0%, #dbeafe 50%, #ede9fe 100%)',
+//                     borderRadius: '10px',
+//                     boxShadow: '0 2px 10px rgba(99, 102, 241, 0.1)',
+//                     border: '1px solid rgba(99, 102, 241, 0.1)',
+//                 }}
+//             >
+//                 <div className="flex items-center gap-3 flex-wrap">
+//                     <span className="font-bold text-black text-md tracking-wide">
+//                         Land Cover Comparison
+//                     </span>
+
+//                     {/* Layer Selector */}
+//                     <LayerSelector
+//                         selectedLayer={selectedLayer}
+//                         onLayerChange={handleLayerChange}
+//                     />
+
+//                     {/* Date Range Selector - Inline when Difference is selected */}
+//                     {showDifferenceUI && availableDates.length > 0 && (
+//                         <DateRangeSelector
+//                             availableDates={availableDates}
+//                             startDate={diffStartDate}
+//                             endDate={diffEndDate}
+//                             onStartDateChange={setDiffStartDate}
+//                             onEndDateChange={setDiffEndDate}
+//                             compact={true}
+//                         />
+//                     )}
+//                 </div>
+
+//                 <div className="flex items-center gap-4">
+//                     <YearSelect label="Left" value={yearLeft} onChange={setYearLeft} disabledYears={[yearRight]} />
+//                     <YearSelect label="Right" value={yearRight} onChange={setYearRight} disabledYears={[yearLeft]} />
+//                 </div>
+//             </div>
+
+
+
+
+//             <div
+//                 className="flex-1 min-h-0 relative rounded-lg overflow-hidden border border-gray-200"
+//                 style={{
+//                     height: isMobile ? "450px" : "100%",
+//                     minHeight: isMobile ? "400px" : "auto",
+//                 }}
+//             >
+//                 <div ref={mapContainerRef} className="absolute inset-0" />
+
+//                 {/* Legend */}
+//                 {!loading && !error && <LULCLegend />}
+
+//                 {/* Fullscreen Button */}
+//                 <div className="absolute top-3 right-3 z-[1500]">
+//                     <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+//                 </div>
+
+//                 {/* Layer Control */}
+//                 {!loading && !error && (
+//                     <div
+//                         className="absolute left-2.5 z-[1500]"
+//                         style={{ top: isMobile ? '140px' : '80px' }}
+//                     >
+//                         <button
+//                             onClick={() => setIsLayerPanelOpen(!isLayerPanelOpen)}
+//                             className={`
+//                                 flex items-center justify-center w-[34px] h-[34px]
+//                                 bg-white rounded-[4px] border-2
+//                                 transition-all duration-200 hover:bg-gray-50
+//                                 ${isLayerPanelOpen
+//                                     ? 'border-blue-500 bg-blue-50 text-blue-600'
+//                                     : 'border-gray-400 text-gray-700 hover:border-gray-500'
+//                                 }
+//                                 focus:outline-none focus:ring-0
+//                                 leaflet-bar
+//                             `}
+//                             style={{ boxShadow: '0 1px 5px rgba(0,0,0,0.1)' }}
+//                             aria-label="Toggle layer control"
+//                         >
+//                             <Layers size={22} />
+//                         </button>
+
+//                         {isLayerPanelOpen && (
+//                             <div
+//                                 className={`
+//                                     absolute top-0 left-full ml-2 bg-white rounded-[4px] border-2 border-gray-300
+//                                     p-3 min-w-[120px] max-w-[150px]
+//                                     ${isMobile ? 'min-w-[120px]' : ''}
+//                                     shadow-lg
+//                                 `}
+//                                 style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}
+//                             >
+//                                 <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+//                                     <h3 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+//                                         Layers
+//                                     </h3>
+//                                     <button
+//                                         onClick={() => setIsLayerPanelOpen(false)}
+//                                         className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 transition-all duration-200"
+//                                     >
+//                                         <X size={16} strokeWidth={3} />
+//                                     </button>
+//                                 </div>
+
+//                                 {/* Overlay Section - Only Assets */}
+//                                 <div>
+//                                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Overlays</p>
+//                                     <div className="flex flex-col gap-1.5">
+//                                         {availableLayers.map((layer) => (
+//                                             <label
+//                                                 key={layer.id}
+//                                                 className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600 transition-colors group"
+//                                             >
+//                                                 <input
+//                                                     type="checkbox"
+//                                                     checked={activeLayers.includes(layer.id)}
+//                                                     onChange={() => handleLayerToggle(layer.id)}
+//                                                     className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer transition-all duration-200"
+//                                                 />
+//                                                 <span className="flex items-center gap-1.5">
+//                                                     {layer.name}
+//                                                 </span>
+//                                             </label>
+//                                         ))}
+//                                     </div>
+//                                 </div>
+
+//                                 {/* Base Map Section */}
+//                                 <div className="mt-2 pt-1 border-t border-gray-100">
+//                                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Base Map</p>
+//                                     <div className="flex flex-col gap-1.5">
+//                                         <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600 transition-colors">
+//                                             <input
+//                                                 type="radio"
+//                                                 name="baseLayer"
+//                                                 checked={baseLayer === 'streets'}
+//                                                 onChange={() => handleBaseLayerChange('streets')}
+//                                                 className="w-3.5 h-3.5 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+//                                             />
+//                                             <span className="flex items-center gap-1.5">Streets</span>
+//                                         </label>
+//                                         <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600 transition-colors">
+//                                             <input
+//                                                 type="radio"
+//                                                 name="baseLayer"
+//                                                 checked={baseLayer === 'satellite'}
+//                                                 onChange={() => handleBaseLayerChange('satellite')}
+//                                                 className="w-3.5 h-3.5 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+//                                             />
+//                                             <span className="flex items-center gap-1.5">Satellite</span>
+//                                         </label>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         )}
+//                     </div>
+//                 )}
+
+//                 {/* Divider Tag */}
+//                 <div
+//                     ref={tagRef}
+//                     className="absolute bottom-4 pointer-events-none"
+//                     style={{
+//                         left: "0px",
+//                         transform: "translateX(-50%)",
+//                         visibility: isDividerReady ? "visible" : "hidden",
+//                         zIndex: 400,
+//                     }}
+//                 >
+//                     <div className="flex items-center gap-2 bg-gray-900/80 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
+//                         <span>{yearLeft}</span>
+//                         <span className="text-gray-400">|</span>
+//                         <span>{yearRight}</span>
+//                     </div>
+//                 </div>
+
+//                 {/* Divider Line */}
+//                 <div
+//                     ref={dividerLineRef}
+//                     className="absolute top-0 bottom-0 pointer-events-none"
+//                     style={{
+//                         left: "0px",
+//                         width: "2px",
+//                         background: "rgba(59, 130, 246, 0.5)",
+//                         transform: "translateX(-50%)",
+//                         boxShadow: "0 0 10px rgba(59, 130, 246, 0.3)",
+//                         visibility: isDividerReady ? "visible" : "hidden",
+//                         zIndex: 399,
+//                     }}
+//                 />
+
+//                 {/* Loading State */}
+//                 {(loading || flyoversLoading || movementLoading) && (
+//                     <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm z-[500]">
+//                         <div className="flex flex-col items-center gap-2 bg-white px-5 py-4 rounded-xl shadow-lg border border-gray-200">
+//                             <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+//                             <p className="text-xs text-gray-500">
+//                                 {loading ? "Loading LULC data..." :
+//                                     movementLoading ? "Loading movement points..." :
+//                                         "Loading flyover data..."}
+//                             </p>
+//                         </div>
+//                     </div>
+//                 )}
+
+//                 {/* Error State */}
+//                 {(error || movementError) && (
+//                     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center gap-2 shadow-lg max-w-md">
+//                         <AlertTriangle size={16} className="flex-shrink-0" />
+//                         <span>{error || movementError}</span>
+//                     </div>
+//                 )}
+
+//                 {/* Regular Chart */}
+//                 {showChart && selectedPointForChart && selectedDetailForChart && (
+//                     <MovementPointsChart
+//                         pointData={selectedPointForChart}
+//                         detailData={selectedDetailForChart}
+//                         onClose={() => {
+//                             setShowChart(false);
+//                             setSelectedPointForChart(null);
+//                             setSelectedDetailForChart(null);
+//                         }}
+//                     />
+//                 )}
+
+//                 {/* Difference Chart */}
+//                 {showDiffChart && diffPointData && diffDetailData && (
+//                     <MovementDiffChart
+//                         pointData={diffPointData}
+//                         detailData={diffDetailData}
+//                         startDate={diffStartDate}
+//                         endDate={diffEndDate}
+//                         onClose={() => {
+//                             setShowDiffChart(false);
+//                             setDiffPointData(null);
+//                             setDiffDetailData(null);
+//                         }}
+//                     />
+//                 )}
+//             </div>
+//         </div>
+//     );
+// }

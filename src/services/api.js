@@ -97,3 +97,63 @@ export const fetchTrafficData = async (flyoverName) => {
     throw error;
   }
 };
+
+
+
+
+
+// ============================================================
+// 🆕 MOVEMENT POINTS APIs (Only these two endpoints)
+// ============================================================
+
+/**
+ * GET /points/data
+ * Fetch all movement points (lightweight - NO timeseries)
+ * Used for map display
+ */
+export const fetchMovementPoints = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/points/data`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching movement points:", error);
+    throw error;
+  }
+};
+
+/**
+ * GET /points/data/{point_id}
+ * Fetch single point with timeseries (detailed data)
+ * Used when user clicks on a point
+ */
+export const fetchMovementPointById = async (pointId) => {
+  try {
+    const response = await fetch(`${BASE_URL}/points/data/${pointId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error fetching point ${pointId}:`, error);
+    throw error;
+  }
+};
