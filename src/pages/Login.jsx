@@ -24,13 +24,20 @@ export default function Login({ onLoginSuccess }) {
 
     try {
       const data = await loginUser({ username, password });
-      sessionStorage.setItem("authToken", data.token);
-      onLoginSuccess?.();
+
+      const loggedInUser = {
+        name: data.name,
+        username: data.username,
+        email: data.email,
+        role: data.role,
+        userId: data.user_id,
+      };
+
+      sessionStorage.setItem("authToken", data.access_token);
+      sessionStorage.setItem("authUser", JSON.stringify(loggedInUser));
+      onLoginSuccess?.(loggedInUser);
     } catch (err) {
-      setError(
-        err.message ||
-          "Couldn't sign in. Check your credentials and try again.",
-      );
+      setError(err.message || "Couldn't sign in. Check your credentials and try again.");
     } finally {
       setLoading(false);
     }
@@ -141,4 +148,3 @@ export default function Login({ onLoginSuccess }) {
     </div>
   );
 }
-
