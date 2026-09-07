@@ -152,20 +152,57 @@ export default function Login({ onLoginSuccess }) {
             </div>
           </div>
           {/* Project Title */}
-          <div className="text-center mb-6 px-1">
-            <h1 className="text-[15px] leading-[1.15] font-bold tracking-[-0.02em] text-slate-900  whitespace-nowrap">
+          {/* Project Title & Tagline */}
+          <div className="text-center mb-6 px-1 w-full">
+            <h1
+              className="
+      text-[14px]
+      sm:text-[15px]
+      leading-[1.2]
+      font-bold
+      tracking-[-0.02em]
+      text-slate-900
+      whitespace-normal
+      sm:whitespace-nowrap
+    "
+            >
               AI Risk Intelligence & Remote Monitoring System
             </h1>
 
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[8px] font-medium leading-tight">
+            <div
+              className="
+      mt-2
+      flex
+      flex-wrap
+      items-center
+      justify-center
+      gap-x-1.5
+      sm:gap-x-2
+      gap-y-1
+      px-1
+      text-[8px]
+      sm:text-[9px]
+      font-medium
+      leading-tight
+    "
+            >
               <span className="text-slate-400">•</span>
-              <span className="text-blue-600">Smart Monitoring</span>
+
+              <span className="text-blue-600 whitespace-nowrap">
+                Smart Monitoring
+              </span>
 
               <span className="text-slate-400">•</span>
-              <span className="text-green-600">Predictive Insights</span>
+
+              <span className="text-green-600 whitespace-nowrap">
+                Predictive Insights
+              </span>
 
               <span className="text-slate-400">•</span>
-              <span className="text-orange-600">Safer Highways</span>
+
+              <span className="text-orange-600 whitespace-nowrap">
+                Safer Highways
+              </span>
             </div>
           </div>
           {/* =================================================
