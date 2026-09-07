@@ -95,7 +95,6 @@ export const fetchTrafficData = async (flyoverName, selectedDate = null) => {
   }
 };
 
-
 // NEW: Fetch available dates for a flyover
 export const fetchTrafficDates = async (flyoverName) => {
   try {
@@ -117,7 +116,6 @@ export const fetchTrafficDates = async (flyoverName) => {
     return [];
   }
 };
-
 
 // ============================================================
 // 🆕 MOVEMENT POINTS APIs (Only these two endpoints)
@@ -176,6 +174,7 @@ export const fetchMovementPointById = async (pointId) => {
 };
 
 // --- Mock auth block — remove once the real /auth/login endpoint exists ---
+// --- Mock auth block — temporarily active while the backend isn't reachable ---
 const MOCK_CREDENTIALS = {
   username: "admin",
   password: "nhai@2026",
@@ -183,20 +182,56 @@ const MOCK_CREDENTIALS = {
 
 export const loginUser = async ({ username, password }) => {
   try {
-    const params = new URLSearchParams({ username, password });
+    // Simulate network latency so loading states behave realistically
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
-    const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
-      method: "POST",
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (
+      username === MOCK_CREDENTIALS.username &&
+      password === MOCK_CREDENTIALS.password
+    ) {
+      return {
+        id: 1,
+        username: "admin",
+        name: "Test User",
+        user_id: "TEST001",
+        mobile: "9999999999",
+        email: "testuser@example.com",
+        role: "admin",
+        access_token: "mock-token",
+        token_type: "bearer",
+      };
     }
 
-    const data = await response.json();
-    return data;
+    throw new Error("Invalid username or password.");
   } catch (error) {
     console.error("Error logging in:", error);
     throw error;
   }
 };
+// --- End mock auth block ---
+
+/*
+  Real backend version — swap this in when /login is reachable again.
+  Just delete the mock block above and uncomment this:
+
+  export const loginUser = async ({ username, password }) => {
+    try {
+      const params = new URLSearchParams({ username, password });
+
+      const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error logging in:", error);
+      throw error;
+    }
+  };
+*/
+// };
