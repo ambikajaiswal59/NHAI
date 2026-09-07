@@ -176,15 +176,42 @@ export const fetchMovementPointById = async (pointId) => {
 };
 
 // --- Mock auth block — remove once the real /auth/login endpoint exists ---
-const MOCK_CREDENTIALS = {
-  username: "admin",
-  password: "nhai@2026",
-};
+// const MOCK_CREDENTIALS = {
+//   username: "admin",
+//   password: "nhai@2026",
+// };
+
+// export const loginUser = async ({ username, password }) => {
+//   try {
+//     const params = new URLSearchParams({ username, password });
+
+//     const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
+//       method: "POST",
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
+
+//     const data = await response.json();
+//     return data;
+//   } catch (error) {
+//     console.error("Error logging in:", error);
+//     throw error;
+//   }
+// };
+
+
+
 
 export const loginUser = async ({ username, password }) => {
+  const MOCK_CREDENTIALS = {
+    username: "admin",
+    password: "nhai@2026",
+  };
+
   try {
     const params = new URLSearchParams({ username, password });
-
     const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
       method: "POST",
     });
@@ -196,7 +223,20 @@ export const loginUser = async ({ username, password }) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error logging in:", error);
-    throw error;
+    console.warn("Backend unreachable, using mock auth", error);
+
+    // Mock authentication
+    if (username === MOCK_CREDENTIALS.username && password === MOCK_CREDENTIALS.password) {
+      return {
+        success: true,
+        user: {
+          username: "admin",
+          role: "admin",
+          token: "mock-jwt-token-12345"
+        }
+      };
+    } else {
+      throw new Error("Invalid username or password");
+    }
   }
 };
