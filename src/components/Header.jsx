@@ -26,7 +26,7 @@ const getCurrentTimeString = () => {
   });
 };
 
-const Header = ({ only } = {}) => {
+const Header = ({ only, onLogout } = {}) => {
   const showLogo = only !== "content";
   const showRest = only !== "logo";
 
@@ -37,6 +37,7 @@ const Header = ({ only } = {}) => {
 
   const dateInputRef = useRef(null);
   const userButtonRef = useRef(null);
+  const menuRef = useRef(null); // ref for the portal-rendered dropdown menu
 
   const formatDateDisplay = (dateString) => {
     if (!dateString) return "Select Date";
@@ -69,11 +70,22 @@ const Header = ({ only } = {}) => {
     setIsUserMenuOpen((prev) => !prev);
   };
 
+  const handleLogout = () => {
+    setIsUserMenuOpen(false);
+    onLogout?.();
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // The menu is rendered via a portal into document.body, so it lives
+      // outside userButtonRef's DOM subtree. Without also checking menuRef,
+      // mousedown on any menu item (including Log Out) gets treated as an
+      // "outside click," closing the menu before the click handler fires.
       if (
         userButtonRef.current &&
-        !userButtonRef.current.contains(event.target)
+        !userButtonRef.current.contains(event.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target)
       ) {
         setIsUserMenuOpen(false);
       }
@@ -195,6 +207,7 @@ const Header = ({ only } = {}) => {
       {isUserMenuOpen &&
         createPortal(
           <div
+            ref={menuRef}
             className="fixed w-52 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-[9999] animate-in fade-in slide-in-from-top-2 duration-150"
             style={{
               top: `${menuCoords.top}px`,
@@ -222,7 +235,10 @@ const Header = ({ only } = {}) => {
             </div>
 
             <div className="border-t border-gray-100 pt-1">
-              <button className="w-full px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 font-bold">
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 font-bold"
+              >
                 <LogOut className="w-4 h-4 text-red-600" />
                 Log Out
               </button>

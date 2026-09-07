@@ -1,6 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE;
 
-
 // Send clicked map location to backend
 export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
   const response = await fetch(`${BASE_URL}/weather/data`, {
@@ -19,8 +18,7 @@ export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
   return data;
 };
 
-
-// fetch weather IDW data for a specific date 
+// fetch weather IDW data for a specific date
 // export const fetchIDWWeatherData = async (date) => {
 //   try {
 //     const response = await fetch(`${BASE_URL}/weather/idw`, {
@@ -46,7 +44,6 @@ export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
 //   }
 // };
 
-
 // api.js - Add new function
 export const fetchMonthlyWeatherData = async () => {
   try {
@@ -68,7 +65,6 @@ export const fetchMonthlyWeatherData = async () => {
     throw error;
   }
 };
-
 
 // Fetch traffic data for a specific flyover
 export const fetchTrafficData = async (flyoverName) => {
@@ -97,10 +93,6 @@ export const fetchTrafficData = async (flyoverName) => {
     throw error;
   }
 };
-
-
-
-
 
 // ============================================================
 // 🆕 MOVEMENT POINTS APIs (Only these two endpoints)
@@ -154,6 +146,31 @@ export const fetchMovementPointById = async (pointId) => {
     return data;
   } catch (error) {
     console.error(`Error fetching point ${pointId}:`, error);
+    throw error;
+  }
+};
+
+// --- Mock auth block — remove once the real /auth/login endpoint exists ---
+const MOCK_CREDENTIALS = {
+  username: "admin",
+  password: "nhai@2026",
+};
+
+export const loginUser = async ({ username, password }) => {
+  try {
+    // Simulate network latency so loading states behave realistically
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    if (
+      username === MOCK_CREDENTIALS.username &&
+      password === MOCK_CREDENTIALS.password
+    ) {
+      return { token: "mock-token" };
+    }
+
+    throw new Error("Invalid username or password.");
+  } catch (error) {
+    console.error("Error logging in:", error);
     throw error;
   }
 };
