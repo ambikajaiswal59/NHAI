@@ -1,5 +1,6 @@
 const BASE_URL = import.meta.env.VITE_API_BASE;
 
+
 // Send clicked map location to backend
 export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
   const response = await fetch(`${BASE_URL}/weather/data`, {
