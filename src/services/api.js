@@ -95,7 +95,6 @@ export const fetchTrafficData = async (flyoverName, selectedDate = null) => {
   }
 };
 
-
 // NEW: Fetch available dates for a flyover
 export const fetchTrafficDates = async (flyoverName) => {
   try {
@@ -117,7 +116,6 @@ export const fetchTrafficDates = async (flyoverName) => {
     return [];
   }
 };
-
 
 // ============================================================
 // 🆕 MOVEMENT POINTS APIs (Only these two endpoints)

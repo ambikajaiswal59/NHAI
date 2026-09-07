@@ -26,7 +26,7 @@ const getCurrentTimeString = () => {
   });
 };
 
-const Header = ({ only, onLogout } = {}) => {
+const Header = ({ only, onLogout, user } = {}) => {
   const showLogo = only !== "content";
   const showRest = only !== "logo";
 
@@ -38,6 +38,19 @@ const Header = ({ only, onLogout } = {}) => {
   const dateInputRef = useRef(null);
   const userButtonRef = useRef(null);
   const menuRef = useRef(null); // ref for the portal-rendered dropdown menu
+
+  const displayName = user?.name || user?.username || "Admin User";
+  const displayEmail = user?.email ;
+  const displayRole = user?.role
+    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+    : "NHAI HQ";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const formatDateDisplay = (dateString) => {
     if (!dateString) return "Select Date";
@@ -185,12 +198,13 @@ const Header = ({ only, onLogout } = {}) => {
                 className="flex items-center gap-2.5 cursor-pointer group hover:bg-black/5 p-1 rounded-lg transition-colors"
               >
                 <div className="w-9 h-9 bg-[#0B172A] text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md group-hover:scale-105 transition-transform">
-                  AD
+                  {initials}
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold text-[#0F172A] leading-tight">
-                    Admin User
+                    {displayName}
                   </div>
+                   <p className="text-[10px] text-gray-500">{displayEmail}</p>
                   <div className="text-[10px] text-gray-500 font-semibold leading-tight">
                     NHAI HQ
                   </div>
@@ -215,8 +229,8 @@ const Header = ({ only, onLogout } = {}) => {
             }}
           >
             <div className="px-4 py-2 border-b border-gray-100">
-              <p className="text-xs font-bold text-gray-900">Admin User</p>
-              <p className="text-[10px] text-gray-500">admin@nhai.gov.in</p>
+              <p className="text-xs font-bold text-gray-900">{displayName}</p>
+              <p className="text-[10px] text-gray-500">{displayEmail}</p>
             </div>
 
             <div className="py-1">
