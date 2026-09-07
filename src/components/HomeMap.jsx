@@ -40,6 +40,7 @@ import {
   ZoomTracker,
   FullscreenFit,
   FocusOnPoint,
+  FitToVisibleFlyovers,
   getFlyoverColor,
   getFlyoverDisplayName,
 } from "./map/mapHelpers";
@@ -127,7 +128,7 @@ export default function HomeMap() {
     startPlayback,
     stopPlayback,
     clearData,
-    changeLayer
+    changeLayer,
   } = useIDWWeather();
 
   const [idwLayer, setIdwLayer] = useState(null);
@@ -152,7 +153,14 @@ export default function HomeMap() {
 
     return markers;
   }, [flyoversList]);
-
+  const visibleFlyoversFitData = useMemo(() => {
+    const visible = flyoverMarkers.filter((f) => visibleFlyoverIds.has(f.id));
+    if (visible.length === 0) return null;
+    return {
+      type: "FeatureCollection",
+      features: visible.flatMap((f) => f.geojson?.features || []),
+    };
+  }, [flyoverMarkers, visibleFlyoverIds]);
   const isDetailZoom = currentZoom >= POPUP_ZOOM_THRESHOLD;
 
   const weatherTarget = useMemo(() => {
@@ -218,7 +226,7 @@ export default function HomeMap() {
           try {
             mapRef.current.removeLayer(idwLayerRef.current);
             idwLayerRef.current = null;
-          } catch (e) { }
+          } catch (e) {}
         }
         preRenderStartedRef.current = false;
         clearData();
@@ -226,7 +234,6 @@ export default function HomeMap() {
     },
     [changeLayer, clearData],
   );
-
 
   // Load buffer boundary for clipping
   useEffect(() => {
@@ -291,7 +298,7 @@ export default function HomeMap() {
         try {
           mapRef.current?.removeLayer(idwLayerRef.current);
           idwLayerRef.current = null;
-        } catch (e) { }
+        } catch (e) {}
       }
       preRenderStartedRef.current = false;
       return;
@@ -301,8 +308,10 @@ export default function HomeMap() {
     let currentData = weatherData;
     if (!currentData || currentData.length === 0) {
       if (selectedMonth && allMonthlyData) {
-        currentData = allMonthlyData.filter(item =>
-          `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
+        currentData = allMonthlyData.filter(
+          (item) =>
+            `${item.year}-${String(item.month).padStart(2, "0")}` ===
+            selectedMonth,
         );
         // ✅ Update weatherData so it's available for future renders
         if (currentData && currentData.length > 0) {
@@ -310,8 +319,10 @@ export default function HomeMap() {
         }
       } else if (allMonthlyData && months.length > 0) {
         const firstMonth = months[0];
-        currentData = allMonthlyData.filter(item =>
-          `${item.year}-${String(item.month).padStart(2, '0')}` === firstMonth
+        currentData = allMonthlyData.filter(
+          (item) =>
+            `${item.year}-${String(item.month).padStart(2, "0")}` ===
+            firstMonth,
         );
         if (currentData && currentData.length > 0) {
           setWeatherData(currentData);
@@ -335,12 +346,12 @@ export default function HomeMap() {
 
     // ✅ If layer exists, update it
     if (idwLayerRef.current) {
-      console.log('🔄 Updating existing IDW layer for month:', selectedMonth);
+      console.log("🔄 Updating existing IDW layer for month:", selectedMonth);
       try {
         idwLayerRef.current.updateData(
           currentData,
           property,
-          `${selectedMonth || "latest"}::${property}`
+          `${selectedMonth || "latest"}::${property}`,
         );
       } catch (error) {
         console.error("Error updating IDW layer:", error);
@@ -349,34 +360,33 @@ export default function HomeMap() {
     }
 
     // ✅ CREATE NEW LAYER
-    console.log('🎨 Creating NEW IDW layer for:', idwLayer);
+    console.log("🎨 Creating NEW IDW layer for:", idwLayer);
 
     (async () => {
       try {
-        const newLayer = createIDWLayer(
-          currentData,
-          property,
-          {
-            opacity: 0.85,
-            zIndex: 100,
-            clipPolygon: bufferBoundary,
-            cacheKey: `${selectedMonth || "latest"}::${property}`,
-            propertyMap: propertyMap,
-          }
-        );
+        const newLayer = createIDWLayer(currentData, property, {
+          opacity: 0.85,
+          zIndex: 100,
+          clipPolygon: bufferBoundary,
+          cacheKey: `${selectedMonth || "latest"}::${property}`,
+          propertyMap: propertyMap,
+        });
 
         // ✅ Pre-render current month first
-        console.log('⏳ Pre-rendering current month before adding to map...');
-        const currentMonthData = allMonthlyData?.filter(item =>
-          `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
-        ) || currentData;
+        console.log("⏳ Pre-rendering current month before adding to map...");
+        const currentMonthData =
+          allMonthlyData?.filter(
+            (item) =>
+              `${item.year}-${String(item.month).padStart(2, "0")}` ===
+              selectedMonth,
+          ) || currentData;
 
         await newLayer.preRenderAllMonths(
           currentMonthData,
           idwLayer,
-          propertyMap
+          propertyMap,
         );
-        console.log('✅ Current month pre-rendered — adding layer to map now');
+        console.log("✅ Current month pre-rendered — adding layer to map now");
 
         // ✅ ADD LAYER TO MAP
         if (!mapRef.current) return;
@@ -386,15 +396,16 @@ export default function HomeMap() {
         // ✅ Pre-render remaining months in background
         if (allMonthlyData?.length && !preRenderStartedRef.current) {
           preRenderStartedRef.current = true;
-          console.log('🔥 Background pre-rendering ALL layers × ALL months...');
+          console.log("🔥 Background pre-rendering ALL layers × ALL months...");
 
-          newLayer.preRenderAllLayers(
-            allMonthlyData,
-            ['temperature', 'rainfall', 'wind'],
-            propertyMap
-          ).catch(err => console.warn('Background pre-render failed:', err));
+          newLayer
+            .preRenderAllLayers(
+              allMonthlyData,
+              ["temperature", "rainfall", "wind"],
+              propertyMap,
+            )
+            .catch((err) => console.warn("Background pre-render failed:", err));
         }
-
       } catch (error) {
         console.error("Error creating IDW layer:", error);
       }
@@ -406,12 +417,17 @@ export default function HomeMap() {
         try {
           mapRef.current.removeLayer(idwLayerRef.current);
           idwLayerRef.current = null;
-        } catch (e) { }
+        } catch (e) {}
       }
     };
-  }, [idwLayer, weatherData, bufferBoundary, selectedMonth, allMonthlyData, months]);
-
-
+  }, [
+    idwLayer,
+    weatherData,
+    bufferBoundary,
+    selectedMonth,
+    allMonthlyData,
+    months,
+  ]);
 
   // Load initial monthly data
   useEffect(() => {
@@ -534,12 +550,15 @@ export default function HomeMap() {
   return (
     <div
       ref={mapWrapperRef}
-      className={`w-full max-w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent overflow-x-hidden ${showTrafficMap ? 'lg:flex-col' : 'lg:flex-row'
-        }`}
+      className={`w-full max-w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent overflow-x-hidden ${
+        showTrafficMap ? "lg:flex-col" : "lg:flex-row"
+      }`}
     >
       {/* <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''
         } ${idwLayer && months.length > 0 && !showTrafficMap ? 'pb-14' : ''}`}> */}
-      <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''}`}>
+      <div
+        className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? "w-full" : ""}`}
+      >
         {overlayVisible && (
           <div
             className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/70 backdrop-blur-sm transition-opacity duration-500"
@@ -751,7 +770,7 @@ export default function HomeMap() {
               height: "100%",
               width: "100%",
               flex: "1",
-              minWidth: "0"
+              minWidth: "0",
             }}
           >
             <ZoomTracker onZoomChange={setCurrentZoom} />
@@ -760,7 +779,7 @@ export default function HomeMap() {
               data={fullscreenFitData}
               isFullscreen={isFullscreen}
             />
-
+            <FitToVisibleFlyovers data={visibleFlyoversFitData} />
             <TileLayer
               key={baseLayer}
               url={activeBaseLayerUrl}
@@ -790,8 +809,13 @@ export default function HomeMap() {
             {idwLayer && weatherData && weatherData.length > 0 && (
               <IDWLegend
                 data={weatherData}
-                property={idwLayer === 'temperature' ? 'avg_temp' :
-                  idwLayer === 'rainfall' ? 'rain_precip' : 'wind'}
+                property={
+                  idwLayer === "temperature"
+                    ? "avg_temp"
+                    : idwLayer === "rainfall"
+                      ? "rain_precip"
+                      : "wind"
+                }
               />
             )}
 
@@ -826,9 +850,14 @@ export default function HomeMap() {
                 />
                 {(selectedHighway || selectedPoint) && (
                   <div className="px-3">
-                    <p className="text-sm font-bold text-gray-700 mb-2 px-1">Weather</p>
+                    <p className="text-sm font-bold text-gray-700 mb-2 px-1">
+                      Weather
+                    </p>
                     <div className="h-[480px]">
-                      <WeatherPanel weather={weather} loading={isWeatherLoading} />
+                      <WeatherPanel
+                        weather={weather}
+                        loading={isWeatherLoading}
+                      />
                     </div>
                   </div>
                 )}
@@ -837,8 +866,6 @@ export default function HomeMap() {
           </div>
         </div>
       )}
-
     </div>
   );
-
 }
