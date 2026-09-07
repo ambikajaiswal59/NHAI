@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE;
-
+const AUTH_BASE_URL = import.meta.env.VITE_AUTH_API_BASE;
 
 // Send clicked map location to backend
 export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
@@ -159,17 +159,18 @@ const MOCK_CREDENTIALS = {
 
 export const loginUser = async ({ username, password }) => {
   try {
-    // Simulate network latency so loading states behave realistically
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    const params = new URLSearchParams({ username, password });
 
-    if (
-      username === MOCK_CREDENTIALS.username &&
-      password === MOCK_CREDENTIALS.password
-    ) {
-      return { token: "mock-token" };
+    const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    throw new Error("Invalid username or password.");
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error("Error logging in:", error);
     throw error;
