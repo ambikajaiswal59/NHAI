@@ -36,10 +36,10 @@ export default function FlyoverDropdown({
             className="fixed inset-0 z-[499]"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-16 right-0 mt-2 w-26 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 py-1 z-[500] overflow-hidden">
+          <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 py-1 z-[500] overflow-hidden">
             <button
               onClick={onToggleAll}
-              className="w-full text-left px-3 py-2 text-[14px] font-semibold text-blue-600 hover:bg-blue-200 border-b border-gray-100"
+              className="w-full text-left px-3 py-2 text-[13px] font-semibold text-blue-600 hover:bg-blue-50 border-b border-gray-100"
             >
               {allSelected ? "Clear all" : "Select all"}
             </button>
@@ -49,12 +49,20 @@ export default function FlyoverDropdown({
                 <button
                   key={f.id}
                   onClick={() => onToggle(f.id)}
-                  className={`
-                    w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 transition-colors
-                    ${isChecked ? 'text-gray-700 bg-blue-100' : 'text-gray-600 bg-white'}
-                  `}
+                  className="w-full flex items-center gap-2 text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 transition-colors"
                 >
-                  <span className="truncate">{f.displayName}</span>
+                  <span
+                    className={`flex items-center justify-center w-4 h-4 rounded border shrink-0 transition-colors
+                      ${isChecked
+                        ? "bg-blue-500 border-blue-500"
+                        : "bg-white border-gray-300"}
+                    `}
+                  >
+                    {isChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </span>
+                  <span className={`truncate ${isChecked ? "text-gray-900" : "text-gray-600"}`}>
+                    {f.displayName}
+                  </span>
                 </button>
               );
             })}

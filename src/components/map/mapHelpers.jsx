@@ -480,3 +480,27 @@ function getGeoJsonBounds(geojson) {
   ];
 }
 
+export function FitToVisibleFlyovers({ data }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !data || !data.features || data.features.length === 0) return;
+
+    try {
+      const layer = L.geoJSON(data);
+      const bounds = layer.getBounds();
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [60, 60],
+          maxZoom: 15, // avoid over-zooming when only 1 point/segment is visible
+          animate: true,
+        });
+      }
+    } catch (e) {
+      console.warn("FitToVisibleFlyovers: failed to fit bounds", e);
+    }
+  }, [data, map]);
+
+  return null;
+}
