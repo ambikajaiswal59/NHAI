@@ -9,6 +9,11 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import {
+  makeFlyoverIcon,
+  getPointDetailFields,
+  formatPointName,
+} from "./map/mapHelpers";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -233,11 +238,23 @@ const locationIcon = L.divIcon({
 // weather is still legible at a glance without recoloring the whole card.
 const CONDITIONS = {
   clear: { icon: Sun, accent: "#fdba55", glow: "rgba(253,186,85,0.35)" },
-  "partly cloudy": { icon: CloudSun, accent: "#63b3ed", glow: "rgba(99,179,237,0.3)" },
+  "partly cloudy": {
+    icon: CloudSun,
+    accent: "#63b3ed",
+    glow: "rgba(99,179,237,0.3)",
+  },
   cloudy: { icon: Cloud, accent: "#9aa5b1", glow: "rgba(154,165,177,0.25)" },
   rain: { icon: CloudRain, accent: "#4fa3d1", glow: "rgba(79,163,209,0.3)" },
-  drizzle: { icon: CloudDrizzle, accent: "#7ec8e3", glow: "rgba(126,200,227,0.28)" },
-  storm: { icon: CloudLightning, accent: "#b39ddb", glow: "rgba(179,157,219,0.35)" },
+  drizzle: {
+    icon: CloudDrizzle,
+    accent: "#7ec8e3",
+    glow: "rgba(126,200,227,0.28)",
+  },
+  storm: {
+    icon: CloudLightning,
+    accent: "#b39ddb",
+    glow: "rgba(179,157,219,0.35)",
+  },
   snow: { icon: CloudSnow, accent: "#d9ecfb", glow: "rgba(217,236,251,0.35)" },
 };
 
@@ -313,7 +330,9 @@ function WeatherPopupCard({ weather, loading }) {
             <span className="text-[56px] font-bold tracking-tight">
               {weather.temp}
             </span>
-            <span className="mt-1.5 text-2xl font-semibold text-white/50">°</span>
+            <span className="mt-1.5 text-2xl font-semibold text-white/50">
+              °
+            </span>
           </div>
           <p className="mt-1 text-sm font-medium text-white/70">
             {weather.condition}
@@ -326,9 +345,7 @@ function WeatherPopupCard({ weather, loading }) {
             className="pointer-events-none absolute inset-0 rounded-2xl blur-xl"
             style={{ background: theme.glow }}
           />
-          <div
-            className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10"
-          >
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10">
             <Icon size={32} strokeWidth={1.8} style={{ color: theme.accent }} />
           </div>
         </div>
@@ -407,12 +424,14 @@ export default function FlyoverMap({
   onMapClick,
   isActive,
   markerPosition,
+  color,
   weather,
   weatherLoading,
 }) {
   const containerRef = useRef(null);
   const markerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDetailZoom, setIsDetailZoom] = useState(false);
   const riskColorMap = { low: "#22c55e", moderate: "#f97316", high: "#ef4444" };
 
   // Compare against this card's own container — with multiple map cards on
@@ -436,13 +455,15 @@ export default function FlyoverMap({
     return "#22c55e";
   };
 
-  const pathColor = getOverallRiskColor();
   const validCenter =
     center && center.length === 2 ? center : [28.6139, 77.229];
 
   const handleClick = (lat, lng) => {
     if (onMapClick) onMapClick(lat, lng);
   };
+  const layerMarkers = (points || []).filter(
+    (point) => Array.isArray(point.latlng) && point.latlng.length === 2,
+  );
 
   // Must live *inside* MapContainer to use useMap(). Invalidates the map's
   // cached size before opening the popup — right after a fullscreen
@@ -463,7 +484,25 @@ export default function FlyoverMap({
     }, [markerPosition, map, markerRef, isFullscreen]);
     return null;
   }
+  function MarkerZoomVisibility({ onDetailZoomChange }) {
+    const map = useMap();
 
+    useEffect(() => {
+      const updateZoom = () => {
+        onDetailZoomChange(map.getZoom() >= 16);
+      };
+
+      updateZoom();
+
+      map.on("zoomend", updateZoom);
+
+      return () => {
+        map.off("zoomend", updateZoom);
+      };
+    }, [map, onDetailZoomChange]);
+
+    return null;
+  }
   return (
     <div ref={containerRef} className="w-full h-full bg-black">
       <style>{`
@@ -526,7 +565,7 @@ export default function FlyoverMap({
 
       <MapContainer
         center={validCenter}
-        zoom={zoom || 15}
+        zoom={15}
         scrollWheelZoom={true}
         dragging={true}
         doubleClickZoom={true}
@@ -542,7 +581,7 @@ export default function FlyoverMap({
         className="rounded-lg"
       >
         <ResizeHandler />
-        <FitBounds geojson={geojson} />
+        {/* <FitBounds geojson={geojson} /> */}
         <FullscreenFit geojson={geojson} isFullscreen={isFullscreen} />
         <MapClickHandler onMapClick={handleClick} />
         <FullscreenControl containerRef={containerRef} />
@@ -556,33 +595,36 @@ export default function FlyoverMap({
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           attribution='&copy; <a href="https://www.esri.com">Esri</a>'
         />
-
+        <MarkerZoomVisibility onDetailZoomChange={setIsDetailZoom} />
         <FlyoverGeoJsonLayer
           data={geojson}
-          color={pathColor}
+          color={color}
           isActive={isActive}
           onFeatureClick={handleClick}
         />
+        {layerMarkers.map((point, index) => {
+          const displayName = formatPointName(point.name);
 
-        {markerPosition && (
-          <Marker
-            key={`${markerPosition.lat}-${markerPosition.lng}`}
-            position={[markerPosition.lat, markerPosition.lng]}
-            icon={locationIcon}
-            ref={markerRef}
-          >
-            {isFullscreen && (
-              <Popup
-                className="weather-popup"
-                closeButton={true}
-                autoPan={true}
-                offset={[0, -6]}
-              >
-                <WeatherPopupCard weather={weather} loading={weatherLoading} />
-              </Popup>
-            )}
-          </Marker>
-        )}
+          return (
+            <Marker
+              key={`layer-marker-${point.id ?? index}`}
+              position={point.latlng}
+              icon={makeFlyoverIcon({
+                color: color,
+                labelText: displayName,
+                detailed: isDetailZoom,
+                name: displayName,
+                detailFields: getPointDetailFields(point),
+              })}
+              eventHandlers={{
+                click: (e) => {
+                  e.originalEvent.stopPropagation();
+                  handleClick(point.latlng[0], point.latlng[1]);
+                },
+              }}
+            />
+          );
+        })}
       </MapContainer>
     </div>
   );
