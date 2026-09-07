@@ -25,15 +25,17 @@ import proj4 from "proj4";
 
 import { loadFlyoverData } from "../utils/geoJsonParser";
 import { useWeather } from "../hooks/useWeather";
+import { useIDWWeather } from "../hooks/useIDWWeather";
 import WeatherPanel from "../components/WeatherPanel";
 import FullscreenButton from "./map/FullscreenButton";
 import FlyoverDropdown from "./map/FlyoverDropdown";
 import IdwLayerDropdown from "./map/IdwLayerDropdown";
+import MonthTimelineBar from "./map/MonthTimelineBar";
+
 import FlyoverDetailsPanel from "./map/FlyoverDetailsPanel";
 import FlyoverMarkers from "./map/FlyoverMarkers";
 import BaseLayerSwitcher, { BASE_LAYERS } from "./map/BaseLayerSwitcher";
 import { createIDWLayer } from "./IDWLeafletLayer";
-import { fetchIDWWeatherData } from "../services/api";
 import {
   ZoomTracker,
   FullscreenFit,
@@ -43,11 +45,15 @@ import {
 } from "./map/mapHelpers";
 import StatsOverview from "./StatsOverview";
 
+import IDWLegend from "./map/IDWLegend";
+
 import GoogleMapComponent from "./GoogleMapTraffic";
 
 const REGION_CENTER = [30.30031525674896, 76.75438508247828];
 const REGION_ZOOM = 11;
-const DETAIL_LABEL_ZOOM = 16;
+const MIN_ZOOM = 9;
+const MAX_ZOOM = 17;
+const POPUP_ZOOM_THRESHOLD = 16;
 
 const UTM43N = "+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs";
 const WGS84 = "EPSG:4326";
@@ -89,166 +95,6 @@ function convertBufferToWGS84(geojson) {
   };
 }
 
-function ZoomToLayer({ data, onZoomComplete, extraZoom = 1 }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!data || data.features.length === 0) return;
-
-    const layer = L.geoJSON(data);
-    const bounds = layer.getBounds();
-
-    if (bounds.isValid()) {
-      map.once("moveend", () => {
-        map.setZoom(map.getZoom() + extraZoom, { animate: true });
-        onZoomComplete && onZoomComplete();
-      });
-
-      map.flyToBounds(bounds, {
-        padding: [2, 2],
-        maxZoom: 15,
-        duration: 1.2,
-      });
-    }
-  }, [data, map, onZoomComplete, extraZoom]);
-
-  return null;
-}
-
-function FadeInGeoJSON({
-  data,
-  style,
-  targetOpacity = 1,
-  targetFillOpacity,
-  ...rest
-}) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(raf);
-  }, [data]);
-
-  const computedStyle = (feature) => {
-    const base = typeof style === "function" ? style(feature) : style || {};
-    return {
-      ...base,
-      opacity: visible ? (base.opacity ?? targetOpacity) : 0,
-      fillOpacity: visible ? (base.fillOpacity ?? targetFillOpacity ?? 0) : 0,
-    };
-  };
-
-  return <GeoJSON data={data} style={computedStyle} {...rest} />;
-}
-
-function getRepresentativeLatLng(geojson) {
-  if (!geojson || !geojson.features || geojson.features.length === 0)
-    return null;
-  const geometry = geojson.features[0].geometry;
-  if (!geometry || !geometry.coordinates) return null;
-
-  const flatten = (coords) => {
-    if (typeof coords[0] === "number") return coords;
-    return flatten(coords[0]);
-  };
-
-  const [lng, lat] = flatten(geometry.coordinates);
-  if (typeof lat !== "number" || typeof lng !== "number") return null;
-  return [lat, lng];
-}
-
-function findProp(props, keys) {
-  if (!props) return null;
-  for (const key of keys) {
-    if (props[key] !== undefined && props[key] !== null && props[key] !== "") {
-      return props[key];
-    }
-  }
-  return null;
-}
-
-function getFlyoverProps(flyover) {
-  return flyover?.geojson?.features?.[0]?.properties || {};
-}
-
-function getNhNumber(flyover) {
-  return findProp(getFlyoverProps(flyover), [
-    "nh_number",
-    "NH_Number",
-    "nhNumber",
-    "NH_NO",
-    "highway",
-    "road_no",
-    "road_number",
-  ]);
-}
-
-function getShortCode(flyover, index) {
-  const props = getFlyoverProps(flyover);
-  return (
-    findProp(props, ["code", "short_code", "structure_id", "structureId"]) ||
-    flyover.id ||
-    `F${index + 1}`
-  );
-}
-
-function makeFlyoverIcon({ color, labelText, detailed }) {
-  const width = detailed ? 240 : 120;
-  return L.divIcon({
-    className: "flyover-marker-icon",
-    html: `
-      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; width:${width}px;">
-        <div style="
-                width: 28px; height: 28px;
-                border-radius: 9999px;
-                background: ${color};
-                border: 2px solid white;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-                display: flex; align-items: center; justify-content: center;
-            ">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-7.58 8-13a8 8 0 1 0-16 0c0 5.42 8 13 8 13Z"></path>
-            <circle cx="12" cy="9" r="2.5"></circle>
-          </svg>
-        </div>
-        ${
-          labelText
-            ? `<div style="
-                  background: white;
-                  border: 1px solid ${color}55;
-                  padding: 2px 7px;
-                  border-radius: 6px;
-                  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-                  font-size: ${detailed ? 11 : 10}px;
-                  font-weight: 600;
-                  color: #1f2937;
-                  white-space: nowrap;
-                  max-width: ${width - 10}px;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-              ">${labelText}</div>`
-            : ""
-        }
-      </div>
-    `,
-    iconSize: [width, 58],
-    iconAnchor: [width / 2, 26],
-  });
-}
-
-function StatChip({ label, value }) {
-  return (
-    <div className="flex flex-col gap-0.5 bg-gray-50 rounded-lg px-2 py-1.5 min-w-0 border border-gray-100">
-      <span className="text-[9px] text-gray-400 uppercase tracking-wide truncate">
-        {label}
-      </span>
-      <span className="text-[13px] font-bold text-gray-800 truncate">
-        {value}
-      </span>
-    </div>
-  );
-}
-
 export default function HomeMap() {
   const [flyoversList, setFlyoversList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -262,26 +108,52 @@ export default function HomeMap() {
   const [showTrafficMap, setShowTrafficMap] = useState(false);
   const [baseLayer, setBaseLayer] = useState("streets");
 
+  // Use the IDW Weather Hook
+  const {
+    weatherData,
+    allMonthlyData,
+    loading: idwLoading,
+    error: idwError,
+    selectedMonth,
+    selectedLayer,
+    months,
+    currentMonthIndex,
+    isPlaying,
+    isRendering,
+    fetchAllMonthlyData,
+    changeMonth,
+    nextMonth,
+    prevMonth,
+    startPlayback,
+    stopPlayback,
+    clearData,
+    changeLayer
+  } = useIDWWeather();
+
   const [idwLayer, setIdwLayer] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [weatherData, setWeatherData] = useState([]);
-  const [weatherError, setWeatherError] = useState(null);
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const [idwLayerInstance, setIdwLayerInstance] = useState(null);
+  const idwLayerRef = useRef(null);
   const [bufferBoundary, setBufferBoundary] = useState(null);
+  const preRenderStartedRef = useRef(false); // ✅ Track if pre-rendering has started
 
   const mapWrapperRef = useRef(null);
   const mapRef = useRef(null);
 
   const flyoverMarkers = useMemo(() => {
-    return flyoversList.map((flyover, index) => ({
-      ...flyover,
-      color: getFlyoverColor(index),
-      displayName: getFlyoverDisplayName(flyover.type, index),
-    }));
+    const markers = flyoversList.map((flyover, index) => {
+      const color = getFlyoverColor(index);
+      const displayName = getFlyoverDisplayName(flyover.type, index);
+
+      return {
+        ...flyover,
+        color: color,
+        displayName: displayName,
+      };
+    });
+
+    return markers;
   }, [flyoversList]);
 
-  const isDetailZoom = currentZoom >= DETAIL_LABEL_ZOOM;
+  const isDetailZoom = currentZoom >= POPUP_ZOOM_THRESHOLD;
 
   const weatherTarget = useMemo(() => {
     if (selectedPoint) {
@@ -329,56 +201,34 @@ export default function HomeMap() {
 
   const { weather, loading: weatherLoadingFromHook } =
     useWeather(weatherTarget);
-  const isWeatherLoading = weatherLoading || weatherLoadingFromHook;
+  const isWeatherLoading = idwLoading || weatherLoadingFromHook;
 
-  const fetchWeatherData = useCallback(async (date) => {
-    if (!date) {
-      setWeatherError("Please select a date");
-      return;
-    }
-
-    setWeatherLoading(true);
-    setWeatherError(null);
-
-    try {
-      const response = await fetchIDWWeatherData(date);
-      if (response && response.data) {
-        setWeatherData(response.data);
-        setSelectedDate(date);
-      } else {
-        throw new Error("No data received from server");
-      }
-    } catch (err) {
-      setWeatherError(err.message || "Failed to fetch weather data");
-      console.error("Error fetching weather:", err);
-    } finally {
-      setWeatherLoading(false);
-    }
-  }, []);
-
+  // Handle IDW layer selection
   const handleIdwSelect = useCallback(
     (layerId) => {
       setIdwLayer(layerId);
+
+      if (layerId !== null) {
+        preRenderStartedRef.current = false;
+        changeLayer(layerId);
+      }
+
       if (layerId === null) {
-        if (idwLayerInstance && mapRef.current) {
+        if (idwLayerRef.current && mapRef.current) {
           try {
-            mapRef.current.removeLayer(idwLayerInstance);
-          } catch (e) {}
-          setIdwLayerInstance(null);
+            mapRef.current.removeLayer(idwLayerRef.current);
+            idwLayerRef.current = null;
+          } catch (e) { }
         }
+        preRenderStartedRef.current = false;
+        clearData();
       }
     },
-    [idwLayerInstance],
+    [changeLayer, clearData],
   );
 
-  const handleDateChange = useCallback(
-    (date) => {
-      setSelectedDate(date);
-      fetchWeatherData(date);
-    },
-    [fetchWeatherData],
-  );
 
+  // Load buffer boundary for clipping
   useEffect(() => {
     let cancelled = false;
 
@@ -432,62 +282,141 @@ export default function HomeMap() {
     };
   }, []);
 
+  // ✅ UPDATED: Create or UPDATE IDW layer with pre-rendering trigger
+
   useEffect(() => {
-    if (idwLayerInstance && mapRef.current) {
-      try {
-        mapRef.current.removeLayer(idwLayerInstance);
-      } catch (e) {}
-      setIdwLayerInstance(null);
+    // If no IDW layer selected, remove layer and return
+    if (!idwLayer) {
+      if (idwLayerRef.current) {
+        try {
+          mapRef.current?.removeLayer(idwLayerRef.current);
+          idwLayerRef.current = null;
+        } catch (e) { }
+      }
+      preRenderStartedRef.current = false;
+      return;
     }
 
-    if (
-      !idwLayer ||
-      !weatherData ||
-      weatherData.length === 0 ||
-      !mapRef.current
-    ) {
+    // ✅ If weatherData is null but allMonthlyData exists, try to get data
+    let currentData = weatherData;
+    if (!currentData || currentData.length === 0) {
+      if (selectedMonth && allMonthlyData) {
+        currentData = allMonthlyData.filter(item =>
+          `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
+        );
+        // ✅ Update weatherData so it's available for future renders
+        if (currentData && currentData.length > 0) {
+          setWeatherData(currentData);
+        }
+      } else if (allMonthlyData && months.length > 0) {
+        const firstMonth = months[0];
+        currentData = allMonthlyData.filter(item =>
+          `${item.year}-${String(item.month).padStart(2, '0')}` === firstMonth
+        );
+        if (currentData && currentData.length > 0) {
+          setWeatherData(currentData);
+          setSelectedMonth(firstMonth);
+        }
+      }
+    }
+
+    // If still no data, return
+    if (!currentData || currentData.length === 0 || !mapRef.current) {
       return;
     }
 
     const propertyMap = {
-      temperature: "temp_c",
-      rainfall: "precip_mm",
-      wind: "wind_kph",
+      temperature: "avg_temp",
+      rainfall: "rain_precip",
+      wind: "wind",
     };
     const property = propertyMap[idwLayer];
-
     if (!property) return;
 
-    try {
-      const newLayer = createIDWLayer(weatherData, property, {
-        opacity: 0.85,
-        zIndex: 100,
-        clipPolygon: bufferBoundary,
-        cacheKey: `${selectedDate || "latest"}::${property}`,
-      });
-
-      newLayer.addTo(mapRef.current);
-      setIdwLayerInstance(newLayer);
-    } catch (error) {
-      console.error("Error creating IDW layer:", error);
-      setWeatherError("Failed to render IDW layer");
+    // ✅ If layer exists, update it
+    if (idwLayerRef.current) {
+      console.log('🔄 Updating existing IDW layer for month:', selectedMonth);
+      try {
+        idwLayerRef.current.updateData(
+          currentData,
+          property,
+          `${selectedMonth || "latest"}::${property}`
+        );
+      } catch (error) {
+        console.error("Error updating IDW layer:", error);
+      }
+      return;
     }
 
+    // ✅ CREATE NEW LAYER
+    console.log('🎨 Creating NEW IDW layer for:', idwLayer);
+
+    (async () => {
+      try {
+        const newLayer = createIDWLayer(
+          currentData,
+          property,
+          {
+            opacity: 0.85,
+            zIndex: 100,
+            clipPolygon: bufferBoundary,
+            cacheKey: `${selectedMonth || "latest"}::${property}`,
+            propertyMap: propertyMap,
+          }
+        );
+
+        // ✅ Pre-render current month first
+        console.log('⏳ Pre-rendering current month before adding to map...');
+        const currentMonthData = allMonthlyData?.filter(item =>
+          `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
+        ) || currentData;
+
+        await newLayer.preRenderAllMonths(
+          currentMonthData,
+          idwLayer,
+          propertyMap
+        );
+        console.log('✅ Current month pre-rendered — adding layer to map now');
+
+        // ✅ ADD LAYER TO MAP
+        if (!mapRef.current) return;
+        newLayer.addTo(mapRef.current);
+        idwLayerRef.current = newLayer;
+
+        // ✅ Pre-render remaining months in background
+        if (allMonthlyData?.length && !preRenderStartedRef.current) {
+          preRenderStartedRef.current = true;
+          console.log('🔥 Background pre-rendering ALL layers × ALL months...');
+
+          newLayer.preRenderAllLayers(
+            allMonthlyData,
+            ['temperature', 'rainfall', 'wind'],
+            propertyMap
+          ).catch(err => console.warn('Background pre-render failed:', err));
+        }
+
+      } catch (error) {
+        console.error("Error creating IDW layer:", error);
+      }
+    })();
+
     return () => {
-      if (idwLayerInstance && mapRef.current) {
+      // Cleanup on unmount
+      if (idwLayerRef.current && mapRef.current) {
         try {
-          mapRef.current.removeLayer(idwLayerInstance);
-        } catch (e) {}
-        setIdwLayerInstance(null);
+          mapRef.current.removeLayer(idwLayerRef.current);
+          idwLayerRef.current = null;
+        } catch (e) { }
       }
     };
-  }, [idwLayer, weatherData, bufferBoundary, selectedDate]);
+  }, [idwLayer, weatherData, bufferBoundary, selectedMonth, allMonthlyData, months]);
 
+
+
+  // Load initial monthly data
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    setSelectedDate(today);
-    fetchWeatherData(today);
-  }, [fetchWeatherData]);
+    fetchAllMonthlyData();
+  }, [fetchAllMonthlyData]);
 
   const loadFlyovers = useCallback(async () => {
     try {
@@ -605,9 +534,12 @@ export default function HomeMap() {
   return (
     <div
       ref={mapWrapperRef}
-      className="w-full min-h-[560px] h-full flex flex-col lg:flex-row gap-3 bg-transparent"
+      className={`w-full max-w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent overflow-x-hidden ${showTrafficMap ? 'lg:flex-col' : 'lg:flex-row'
+        }`}
     >
-      <div className="relative flex-1 min-w-0 min-h-[400px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200">
+      {/* <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''
+        } ${idwLayer && months.length > 0 && !showTrafficMap ? 'pb-14' : ''}`}> */}
+      <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''}`}>
         {overlayVisible && (
           <div
             className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/70 backdrop-blur-sm transition-opacity duration-500"
@@ -620,14 +552,12 @@ export default function HomeMap() {
           </div>
         )}
 
-        {/* LEFT CONTROLS — only in Leaflet view, since traffic view's
-            spot there is occupied by GoogleMapComponent's own
-            "MAP TYPE" panel */}
+        {/* LEFT CONTROLS — only in Leaflet view */}
         {!showTrafficMap && (
           <div
             className="
               absolute
-              left-[11.1px]
+              left-[10px]
               top-[135px]
               z-[1500]
               flex
@@ -644,6 +574,36 @@ export default function HomeMap() {
               activeLayer={baseLayer}
               onSelect={setBaseLayer}
             />
+          </div>
+        )}
+
+        {/* EXIT BUTTON - Only show when traffic view is active, positioned on left */}
+        {showTrafficMap && (
+          <div
+            className="
+              absolute
+              left-[19px]
+              sm:left-[22px]
+              top-[150px]
+              z-[1500]
+              sm:top-[104px]
+            "
+          >
+            <button
+              onClick={handleToggleTrafficMap}
+              className="
+                flex items-center justify-center gap-1
+                px-2 py-1
+                rounded-lg
+                shadow-md
+                transition-all duration-200
+                text-[12px] font-semibold
+                whitespace-nowrap
+                bg-blue-500 text-white hover:bg-blue-600
+              "
+            >
+              <span>Exit</span>
+            </button>
           </div>
         )}
 
@@ -667,46 +627,34 @@ export default function HomeMap() {
             overflow-visible
           "
         >
-          {/* FULLSCREEN — only in traffic view, sits next to Exit */}
-          {showTrafficMap && (
-            <div className="shrink-0 isolate [zoom:0.57] sm:[zoom:1]">
-              <FullscreenButton
-                isFullscreen={isFullscreen}
-                onToggle={toggleFullscreen}
-              />
+          {/* TRAFFIC BUTTON - Only show when NOT in traffic view */}
+          {!showTrafficMap && (
+            <div
+              className="
+                shrink-0
+                isolate
+                [zoom:0.57]
+                sm:[zoom:1]
+              "
+            >
+              <button
+                onClick={handleToggleTrafficMap}
+                className="
+                  flex items-center justify-center gap-1
+                  px-2 py-1
+                  rounded-lg
+                  shadow-md
+                  transition-all duration-200
+                  text-[12px] font-semibold
+                  whitespace-nowrap
+                  bg-white text-gray-700 hover:bg-gray-50 border border-gray-200
+                "
+              >
+                <TrafficCone className="w-4 h-4 shrink-0 text-blue-500" />
+                <span>Traffic</span>
+              </button>
             </div>
           )}
-
-          {/* TRAFFIC / EXIT */}
-          <div
-            className="
-              shrink-0
-              isolate
-              [zoom:0.57]
-              sm:[zoom:1]
-            "
-          >
-            <button
-              onClick={handleToggleTrafficMap}
-              className={`
-                flex items-center justify-center gap-1
-                px-2 py-1
-                rounded-lg
-                shadow-md
-                transition-all duration-200
-              text-[12px] font-semibold text-gray-700 hover:bg-gray-50
-                whitespace-nowrap
-                ${
-                  showTrafficMap
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
-                }
-              `}
-            >
-              <TrafficCone className="w-4 h-4 shrink-0" />
-              <span>{showTrafficMap ? "Exit" : "Traffic"}</span>
-            </button>
-          </div>
 
           {!showTrafficMap && (
             <>
@@ -747,22 +695,36 @@ export default function HomeMap() {
                   <IdwLayerDropdown
                     selectedId={idwLayer}
                     onSelect={handleIdwSelect}
-                    selectedDate={selectedDate}
-                    onDateChange={handleDateChange}
+                    selectedMonth={selectedMonth}
                     isLoading={isWeatherLoading}
-                    dataCount={weatherData.length}
-                    error={weatherError}
+                    dataCount={weatherData?.length || 0}
+                    error={idwError}
+                    months={months}
+                    currentMonthIndex={currentMonthIndex}
+                    isPlaying={isPlaying}
+                    isRendering={isRendering}
+                    onPlay={startPlayback}
+                    onPause={stopPlayback}
+                    onNextMonth={nextMonth}
+                    onPrevMonth={prevMonth}
                   />
                 </div>
                 <div className="block md:hidden">
                   <IdwLayerDropdown
                     selectedId={idwLayer}
                     onSelect={handleIdwSelect}
-                    selectedDate={selectedDate}
-                    onDateChange={handleDateChange}
+                    selectedMonth={selectedMonth}
                     isLoading={isWeatherLoading}
-                    dataCount={weatherData.length}
-                    error={weatherError}
+                    dataCount={weatherData?.length || 0}
+                    error={idwError}
+                    months={months}
+                    currentMonthIndex={currentMonthIndex}
+                    isPlaying={isPlaying}
+                    isRendering={isRendering}
+                    onPlay={startPlayback}
+                    onPause={stopPlayback}
+                    onNextMonth={nextMonth}
+                    onPrevMonth={prevMonth}
                     compact={true}
                   />
                 </div>
@@ -776,57 +738,84 @@ export default function HomeMap() {
             <GoogleMapComponent />
           </div>
         ) : (
-          <>
-            <MapContainer
-              ref={mapRef}
-              center={REGION_CENTER}
-              zoom={REGION_ZOOM}
-              scrollWheelZoom
-              zoomControl
-              attributionControl={false}
-              style={{ height: "100%", width: "100%" }}
-            >
-              <ZoomTracker onZoomChange={setCurrentZoom} />
+          <MapContainer
+            ref={mapRef}
+            center={REGION_CENTER}
+            zoom={REGION_ZOOM}
+            minZoom={MIN_ZOOM}
+            maxZoom={MAX_ZOOM}
+            scrollWheelZoom
+            zoomControl
+            attributionControl={false}
+            style={{
+              height: "100%",
+              width: "100%",
+              flex: "1",
+              minWidth: "0"
+            }}
+          >
+            <ZoomTracker onZoomChange={setCurrentZoom} />
 
-              <FullscreenFit
-                data={fullscreenFitData}
-                isFullscreen={isFullscreen}
-              />
+            <FullscreenFit
+              data={fullscreenFitData}
+              isFullscreen={isFullscreen}
+            />
 
-              <TileLayer
-                key={baseLayer}
-                url={activeBaseLayerUrl}
-                subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                maxZoom={20}
-                attribution="&copy; Google"
-              />
+            <TileLayer
+              key={baseLayer}
+              url={activeBaseLayerUrl}
+              subdomains={["mt0", "mt1", "mt2", "mt3"]}
+              maxZoom={20}
+              attribution="&copy; Google"
+            />
 
-              <FocusOnPoint
-                latlng={focusTarget.latlng}
-                triggerKey={focusTarget.key}
-                zoom={15}
-              />
+            <FocusOnPoint
+              latlng={focusTarget.latlng}
+              triggerKey={focusTarget.key}
+              zoom={15}
+            />
 
-              <FlyoverMarkers
-                flyoverMarkers={flyoverMarkers}
-                visibleFlyoverIds={visibleFlyoverIds}
-                isDetailZoom={isDetailZoom}
-                isFullscreen={isFullscreen}
-                weather={weather}
-                weatherLoading={isWeatherLoading}
-                onSelectHighway={handleSelectHighway}
-                onSelectPoint={handleSelectPoint}
+            <FlyoverMarkers
+              flyoverMarkers={flyoverMarkers}
+              visibleFlyoverIds={visibleFlyoverIds}
+              isDetailZoom={isDetailZoom}
+              isFullscreen={isFullscreen}
+              weather={weather}
+              weatherLoading={isWeatherLoading}
+              onSelectHighway={handleSelectHighway}
+              onSelectPoint={handleSelectPoint}
+            />
+
+            {/* IDW Legend - Bottom Left */}
+            {idwLayer && weatherData && weatherData.length > 0 && (
+              <IDWLegend
+                data={weatherData}
+                property={idwLayer === 'temperature' ? 'avg_temp' :
+                  idwLayer === 'rainfall' ? 'rain_precip' : 'wind'}
               />
-            </MapContainer>
-          </>
+            )}
+
+            {/* Month Timeline Bar - Bottom Center */}
+            {idwLayer && months.length > 0 && !showTrafficMap && (
+              <MonthTimelineBar
+                months={months}
+                currentMonthIndex={currentMonthIndex}
+                isPlaying={isPlaying}
+                onPlay={startPlayback}
+                onPause={stopPlayback}
+                onSelectMonth={changeMonth}
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500]"
+              />
+            )}
+          </MapContainer>
         )}
       </div>
 
       {!isFullscreen && !showTrafficMap && (
-        <div className=" w-full lg:w-[380px] shrink-0">
-          <div className="w-full h-full flex flex-col gap-3">
+        <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0 flex-shrink-0">
+          <div className="w-full h-full min-h-0 flex flex-col gap-3">
             <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 <FlyoverDetailsPanel
                   selectedHighway={selectedHighway}
                   selectedPoint={selectedPoint}
@@ -835,17 +824,11 @@ export default function HomeMap() {
                   onSelectHighway={handleSelectHighway}
                   onSelectPoint={handleSelectPoint}
                 />
-
                 {(selectedHighway || selectedPoint) && (
                   <div className="px-3">
-                    <p className="text-sm font-bold text-gray-700 mb-2 px-1">
-                      Weather
-                    </p>
+                    <p className="text-sm font-bold text-gray-700 mb-2 px-1">Weather</p>
                     <div className="h-[480px]">
-                      <WeatherPanel
-                        weather={weather}
-                        loading={isWeatherLoading}
-                      />
+                      <WeatherPanel weather={weather} loading={isWeatherLoading} />
                     </div>
                   </div>
                 )}
@@ -854,6 +837,8 @@ export default function HomeMap() {
           </div>
         </div>
       )}
+
     </div>
   );
+
 }

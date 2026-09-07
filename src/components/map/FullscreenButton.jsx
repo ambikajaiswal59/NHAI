@@ -5,37 +5,26 @@ export default function FullscreenButton({ isFullscreen, onToggle }) {
     <button
       onClick={onToggle}
       className={`
-        relative group flex items-center justify-center 
-        bg-white shadow-sm
-        w-[34px] h-[34px]
-        border border-[#888]  // ← Even darker
-        transition-all duration-150 
-        hover:bg-[#f4f4f4] hover:border-[#555]  // ← Darker on hover
-        active:bg-[#e6e6e6] active:border-[#555]
-        ${
-          isFullscreen
-            ? "text-blue-600 border-[#888] bg-blue-50 hover:bg-blue-100"
-            : "text-[#333]"
+        flex mt-2 items-center justify-center w-[34px] h-[34px]
+        bg-white rounded-[4px] border-2
+        transition-all duration-200 hover:bg-gray-50
+        ${isFullscreen
+          ? 'border-blue-500 bg-blue-50 text-blue-600'
+          : 'border-gray-400 text-gray-700 hover:border-gray-500'
         }
+        focus:outline-none focus:ring-0
+        leaflet-bar
       `}
       style={{
-        borderRadius: "5px",
-        fontSize: "18px",
-        fontWeight: "bold",
-        lineHeight: "30px",
-        cursor: "pointer",
-        outline: "none",
-        fontFamily: '"Helvetica Neue", Arial, sans-serif',
-        boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-        border: "3px solid #ccc",
-        background: "#fff",
+        boxShadow: '0 1px 5px rgba(0,0,0,0.1)',
       }}
       aria-label="Toggle fullscreen"
+      title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
     >
       {isFullscreen ? (
-        <Minimize className="w-3.5 h-3.5" strokeWidth={2.5} />
+        <Minimize className="w-4 h-4" strokeWidth={2.5} />
       ) : (
-        <Maximize className="w-3.5 h-3.5" strokeWidth={2.5} />
+        <Maximize className="w-4 h-4" strokeWidth={2.5} />
       )}
     </button>
   );

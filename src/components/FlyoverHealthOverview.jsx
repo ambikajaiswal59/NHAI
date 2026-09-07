@@ -109,7 +109,7 @@ function FlyoverCard({ flyover }) {
   const style = STATUS_STYLES[flyover.status];
 
   return (
-    <div className="flex-1 min-w-[220px] bg-white rounded-xl2 shadow-card ring-1 ring-gray-100 overflow-hidden">
+    <div className="w-full bg-white rounded-xl2 shadow-card ring-1 ring-gray-100 overflow-hidden">
       {/* Image + status badge */}
       <div className="relative h-48 w-full">
         <img
@@ -168,11 +168,10 @@ export default function FlyoverHealthOverview() {
         <h2 className="text-[15px] font-bold text-gray-900">
           Flyover Health Overview
         </h2>
-        {/* <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-700">
-          View All
-        </button> */}
       </div>
-      <div className="flex flex-col sm:flex-row gap-3">
+
+      {/* Grid: 1 col mobile → 2 cols tablet/laptop → 4 cols on large screens */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         {FLYOVERS.map((flyover) => (
           <FlyoverCard key={flyover.id} flyover={flyover} />
         ))}

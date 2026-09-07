@@ -5,7 +5,7 @@ import WeatherMapPage from "../pages/WeatherMapPage";
 import ReportsPage from "../pages/ReportsPage";
 import Alertspage from "../pages/AlertsPage";
 
-import TerrainPage from "../pages/TerrainPage";
+import TopographyPage from "../pages/TopographyPage";
 import TrafficPage from "../pages/TrafiicPage";
 
 // Route definitions
@@ -13,7 +13,7 @@ export const ROUTES = {
     HOME: "home",
     DASHBOARD: "dashboard",
     WEATHER: "weather",
-    TERRAIN: "terrain",
+    Topography: "topography",
     TRAFFIC: "traffic",
     REPORTS: "reports",
     ALERTS: "alerts",
@@ -25,7 +25,7 @@ export const PAGE_COMPONENTS = {
     [ROUTES.HOME]: HomeMap,
     [ROUTES.DASHBOARD]: DashboardPage,
     [ROUTES.WEATHER]: WeatherMapPage,
-    [ROUTES.TERRAIN]: TerrainPage,
+    [ROUTES.Topography]: TopographyPage,
     [ROUTES.TRAFFIC]: TrafficPage,
     [ROUTES.REPORTS]: ReportsPage,
     [ROUTES.ALERTS]: Alertspage,

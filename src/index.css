@@ -19,6 +19,7 @@
    MOBILE MAP CONTROLS
    ============================================================ */
 @media (max-width: 639px) {
+
   /* Move Leaflet + / - controls below the top buttons */
   .leaflet-top.leaflet-left {
     top: 65px !important;
@@ -37,7 +38,9 @@
     margin-top: 8px !important;
   }
 }
+
 @layer utilities {
+
   /* Extra small screens (phones) */
   @media (max-width: 480px) {
     .xs\:block {
@@ -145,11 +148,31 @@ body {
 
 /* Google Maps fullscreen button */
 .google-map-container .gm-control-active[title="Toggle fullscreen view"] {
-  transform: translate(-10px,35px);
+  transform: translate(-10px, 35px);
 }
 
 @media (max-width: 640px) {
   .google-map-container .gm-fullscreen-control {
     display: none !important;
   }
+}
+
+
+
+
+
+
+
+
+
+
+
+.gm-style-iw-c {
+  padding: 2px 1px 4px 4px !important;
+  /* top, right, bottom, left */
+}
+
+.gm-style-iw-d {
+  overflow: hidden !important;
+  padding: 0 !important;
 }

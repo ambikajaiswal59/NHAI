@@ -2,6 +2,7 @@ import { Popup, Marker } from "react-leaflet";
 import { FadeInGeoJSON, makeFlyoverIcon, getPointDetailFields, formatPointName } from "./mapHelpers";
 import WeatherPopupCard from "../WeatherPopupCard";
 
+
 export default function FlyoverMarkers({
   flyoverMarkers,
   visibleFlyoverIds,
@@ -14,11 +15,10 @@ export default function FlyoverMarkers({
 }) {
   const visible = flyoverMarkers.filter((f) => visibleFlyoverIds.has(f.id));
 
+
+
   return (
     <>
-      {/* Boundary — one per highway, own color. Clicking it still selects
-          the highway for the details panel, even though there's no pin
-          sitting on top of it anymore. */}
       {visible.map((flyover) => (
         <FadeInGeoJSON
           key={`line-${flyover.id}`}
@@ -30,12 +30,11 @@ export default function FlyoverMarkers({
         />
       ))}
 
-      {/* Only named-point markers — this is the single source of pins on
-          the map now, so there's no way for two markers to land on the
-          same spot. */}
       {visible.flatMap((flyover) =>
         (flyover.namedPoints || []).map((point) => {
           const displayName = formatPointName(point.name);
+
+
           return (
             <Marker
               key={`point-${flyover.id}-${point.id}`}
