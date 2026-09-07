@@ -7,32 +7,13 @@ import StatsCards from "../components/StatsCards";
 import FlyoverCard from "../components/FlyoverCards";
 import WeatherPanel from "../components/WeatherPanel";
 import AlertMarquee from "../components/AlertMarquess";
+import { getFlyoverColor } from "../components/map/mapHelpers";
 
 export default function DashboardPage() {
   // Load real flyover data from GeoJSON — this page is the only one that
   // needs it, so it's fetched here instead of in App.jsx.
   const { flyovers, loading, error } = useFlyoverData();
-  // const alerts = [
-  //   {
-  //     id: 1,
-  //     severity: "critical",
-  //     message: "High risk detected on Sector 4 flyover",
-  //     meta: "2 min ago",
-  //   },
-  //   {
-  //     id: 2,
-  //     severity: "warning",
-  //     message: "Visibility dropping below 5km near Ambala",
-  //     meta: "12 min ago",
-  //   },
-  //   {
-  //     id: 3,
-  //     severity: "info",
-  //     message: "Satellite pass completed for all active flyovers",
-  //     meta: "34 min ago",
-  //   },
-  // ];
-  // Calculate stats from loaded data
+
   const stats =
     flyovers.length > 0
       ? getStatsFromFlyovers(flyovers)
@@ -159,10 +140,11 @@ export default function DashboardPage() {
 
           {/* Flyover Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:flex-1 lg:min-h-0">
-            {flyovers.map((f) => (
+            {flyovers.map((f, index) => (
               <div key={f.id} className="h-80 sm:h-96 md:h-104 lg:h-full">
                 <FlyoverCard
                   {...f}
+                  color={getFlyoverColor(index)}
                   isActive={activeId === f.id}
                   onActivate={() => setActiveId(f.id)}
                   onMapClick={handleMapClick}
@@ -181,7 +163,8 @@ export default function DashboardPage() {
               <span className="text-warning text-[11px]">⚠️</span>
             </span>
             <p className="text-[10px] sm:text-xs text-gray-500 font-medium">
-              Risk status is based on latest satellite analysis and AI assessment
+              Risk status is based on latest satellite analysis and AI
+              assessment
             </p>
           </div>
         </div>
