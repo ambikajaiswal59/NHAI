@@ -67,8 +67,8 @@ export const fetchMonthlyWeatherData = async () => {
   }
 };
 
-// Fetch traffic data for a specific flyover
-export const fetchTrafficData = async (flyoverName) => {
+// Fetch traffic data for a specific flyover with optional date filter
+export const fetchTrafficData = async (flyoverName, selectedDate = null) => {
   try {
     const response = await fetch(`${BASE_URL}/traffic/data`, {
       method: "POST",
@@ -77,6 +77,7 @@ export const fetchTrafficData = async (flyoverName) => {
       },
       body: JSON.stringify({
         name: flyoverName,
+        date: selectedDate, // Add date field (null for last 24 hours)
       }),
     });
 
@@ -87,13 +88,36 @@ export const fetchTrafficData = async (flyoverName) => {
     }
 
     const data = await response.json();
-
     return data;
   } catch (error) {
     console.error("Error fetching traffic data:", error);
     throw error;
   }
 };
+
+
+// NEW: Fetch available dates for a flyover
+export const fetchTrafficDates = async (flyoverName) => {
+  try {
+    const response = await fetch(`${BASE_URL}/traffic/dates/${flyoverName}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.available_dates || [];
+  } catch (error) {
+    console.error("Error fetching traffic dates:", error);
+    return [];
+  }
+};
+
 
 // ============================================================
 // 🆕 MOVEMENT POINTS APIs (Only these two endpoints)

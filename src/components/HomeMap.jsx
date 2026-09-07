@@ -811,7 +811,7 @@ export default function HomeMap() {
         )}
       </div>
 
-      {!isFullscreen && !showTrafficMap && (
+      {!isFullscreen && !showTrafficMap && (selectedHighway || selectedPoint) && (
         <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0 flex-shrink-0">
           <div className="w-full h-full min-h-0 flex flex-col gap-3">
             <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
