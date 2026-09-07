@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE;
-
+const AUTH_BASE_URL = import.meta.env.VITE_AUTH_API_BASE;
 
 // Send clicked map location to backend
 export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
@@ -19,8 +19,7 @@ export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
   return data;
 };
 
-
-// fetch weather IDW data for a specific date 
+// fetch weather IDW data for a specific date
 // export const fetchIDWWeatherData = async (date) => {
 //   try {
 //     const response = await fetch(`${BASE_URL}/weather/idw`, {
@@ -46,7 +45,6 @@ export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
 //   }
 // };
 
-
 // api.js - Add new function
 export const fetchMonthlyWeatherData = async () => {
   try {
@@ -69,9 +67,8 @@ export const fetchMonthlyWeatherData = async () => {
   }
 };
 
-
-// Fetch traffic data for a specific flyover
-export const fetchTrafficData = async (flyoverName) => {
+// Fetch traffic data for a specific flyover with optional date filter
+export const fetchTrafficData = async (flyoverName, selectedDate = null) => {
   try {
     const response = await fetch(`${BASE_URL}/traffic/data`, {
       method: "POST",
@@ -80,6 +77,7 @@ export const fetchTrafficData = async (flyoverName) => {
       },
       body: JSON.stringify({
         name: flyoverName,
+        date: selectedDate, // Add date field (null for last 24 hours)
       }),
     });
 
@@ -90,7 +88,6 @@ export const fetchTrafficData = async (flyoverName) => {
     }
 
     const data = await response.json();
-
     return data;
   } catch (error) {
     console.error("Error fetching traffic data:", error);
@@ -99,7 +96,27 @@ export const fetchTrafficData = async (flyoverName) => {
 };
 
 
+// NEW: Fetch available dates for a flyover
+export const fetchTrafficDates = async (flyoverName) => {
+  try {
+    const response = await fetch(`${BASE_URL}/traffic/dates/${flyoverName}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.available_dates || [];
+  } catch (error) {
+    console.error("Error fetching traffic dates:", error);
+    return [];
+  }
+};
 
 
 // ============================================================
@@ -155,5 +172,71 @@ export const fetchMovementPointById = async (pointId) => {
   } catch (error) {
     console.error(`Error fetching point ${pointId}:`, error);
     throw error;
+  }
+};
+
+// --- Mock auth block — remove once the real /auth/login endpoint exists ---
+// const MOCK_CREDENTIALS = {
+//   username: "admin",
+//   password: "nhai@2026",
+// };
+
+// export const loginUser = async ({ username, password }) => {
+//   try {
+//     const params = new URLSearchParams({ username, password });
+
+//     const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
+//       method: "POST",
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
+
+//     const data = await response.json();
+//     return data;
+//   } catch (error) {
+//     console.error("Error logging in:", error);
+//     throw error;
+//   }
+// };
+
+
+
+
+export const loginUser = async ({ username, password }) => {
+  const MOCK_CREDENTIALS = {
+    username: "admin",
+    password: "nhai@2026",
+  };
+
+  try {
+    const params = new URLSearchParams({ username, password });
+    const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.warn("Backend unreachable, using mock auth", error);
+
+    // Mock authentication
+    if (username === MOCK_CREDENTIALS.username && password === MOCK_CREDENTIALS.password) {
+      return {
+        success: true,
+        user: {
+          username: "admin",
+          role: "admin",
+          token: "mock-jwt-token-12345"
+        }
+      };
+    } else {
+      throw new Error("Invalid username or password");
+    }
   }
 };
