@@ -25,7 +25,6 @@ import {
 
 import MovementPointsChart from "./MovementPointsChart";
 import MovementDiffChart from "./MovementDiffChart";
-import SoilMap from "./SoilMap";
 
 /* ============================================================================
  * CONSTANTS
@@ -55,6 +54,67 @@ const LULC_CLASSES = [
   { color: "#ecfff8", label: "Bare Ground" },
   { color: "#99998f", label: "Rangeland" },
 ];
+
+// Soil taxonomy colors
+const SOIL_TAXO_COLORS = {
+  "Fluventic Ustochrepts": "#4CAF50",
+  "Natric Ustochrepts": "#FF5722",
+  "Typic Haplustalfs": "#C6CE3D",
+  "Typic Ustifluvents": "#4472C4",
+  "Typic Ustochrepts": "#9C27B0",
+  "Udic Ustochrepts": "#26C6DA",
+};
+const DEFAULT_SOIL_COLOR = "#9E9E9E";
+
+function getSoilColor(props) {
+  return SOIL_TAXO_COLORS[props?.S_TAXO] || DEFAULT_SOIL_COLOR;
+}
+
+function soilStyle(feature) {
+  return {
+    fillColor: getSoilColor(feature.properties),
+    weight: 1.5,
+    opacity: 0.9,
+    color: "#333333",
+    fillOpacity: 0.7,
+  };
+}
+
+function soilHighlightStyle(feature) {
+  return {
+    fillColor: getSoilColor(feature.properties),
+    weight: 3,
+    opacity: 1,
+    color: "#1f2937",
+    fillOpacity: 0.85,
+  };
+}
+
+function onEachSoilFeature(feature, layer) {
+  const props = feature.properties || {};
+
+  layer.bindPopup(`
+    <div style="font-size:12px; font-family:Arial,sans-serif; max-width:250px; padding:4px;">
+      <div style="font-weight:bold; font-size:14px; color:#1f2937; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-bottom:4px;">
+        Soil ID: ${props.SOIL_ID || "N/A"}
+      </div>
+      <table style="width:100%; font-size:11px; border-collapse:collapse;">
+        <tr><td style="padding:2px 0; color:#6b7280;">Texture:</td><td style="padding:2px 0; font-weight:600;">${props.S_TEXTURE || "N/A"}</td></tr>
+        <tr><td style="padding:2px 0; color:#6b7280;">Depth:</td><td style="padding:2px 0; font-weight:600;">${props.SOIL_DEPTH || "N/A"}</td></tr>
+        <tr><td style="padding:2px 0; color:#6b7280;">Taxonomy:</td><td style="padding:2px 0; font-weight:600;">${props.S_TAXO || "N/A"}</td></tr>
+        <tr><td style="padding:2px 0; color:#6b7280;">Region:</td><td style="padding:2px 0; font-weight:600;">${props.S_REGION || "N/A"}</td></tr>
+        <tr><td style="padding:2px 0; color:#6b7280;">Sub Region:</td><td style="padding:2px 0; font-weight:600;">${props.S_SUB_REG || "N/A"}</td></tr>
+        <tr><td style="padding:2px 0; color:#6b7280;">Slope:</td><td style="padding:2px 0; font-weight:600;">${props.SL_CLASS || "N/A"}</td></tr>
+        ${props.CLASS && props.CLASS !== "Nil" ? `<tr><td style="padding:2px 0; color:#6b7280;">Class:</td><td style="padding:2px 0; font-weight:600; color:#dc2626;">${props.CLASS}</td></tr>` : ""}
+      </table>
+    </div>
+  `);
+
+  layer.on({
+    mouseover: (e) => e.target.setStyle(soilHighlightStyle(feature)),
+    mouseout: (e) => e.target.setStyle(soilStyle(feature)),
+  });
+}
 
 // Velocity color ranges for movement points
 const VELOCITY_RANGES = [
@@ -172,19 +232,18 @@ function addAllToMap(map, layers) {
 
 function VelocityLegend() {
   return (
-    <div className="absolute bottom-3 left-3 z-[1500] bg-white/95 backdrop-blur-sm rounded-md shadow-md border border-gray-200 px-4 py-2 max-w-[200px] max-[480px]:px-2.5 max-[480px]:py-1.5 max-[480px]:max-w-[150px] max-[480px]:bottom-2 max-[480px]:left-2">
-      <div className="text-[10px] font-medium text-gray-500 text-center mb-1 max-[480px]:text-[9px]">
+    <div className="absolute bottom-3 left-3 z-[1500] bg-blue-200 backdrop-blur-sm rounded-md shadow-md border border-gray-200 px-4 py-2 max-w-[200px] max-[480px]:px-1.5 max-[480px]:py-1 max-[480px]:max-w-[108px] max-[480px]:bottom-2 max-[480px]:left-2">
+      <div className="text-[10px] font-medium text-black-100 text-center mb-1 max-[480px]:text-[7px] max-[480px]:mb-0.5 max-[480px]:leading-tight">
         Velocity (mm/yr)
       </div>
 
-      <div className="flex items-center gap-1">
-        <span className="text-[9px] font-medium text-gray-600 max-[480px]:text-[8px]">
+      <div className="flex items-center gap-1 max-[480px]:gap-0.5">
+        <span className="text-[9px] font-medium text-black-100 max-[480px]:text-[6.5px]">
           -50
         </span>
 
         <div
-          className="flex-1 h-3 rounded-full overflow-hidden flex max-[480px]:h-2.5"
-          style={{ minWidth: "100px" }}
+          className="flex-1 h-3 rounded-full overflow-hidden flex min-w-[100px] max-[480px]:h-1.5 max-[480px]:min-w-[52px]"
         >
           {VELOCITY_RANGES.map((range, index) => {
             const totalRange = 100;
@@ -207,7 +266,7 @@ function VelocityLegend() {
           })}
         </div>
 
-        <span className="text-[9px] font-medium text-gray-600 max-[480px]:text-[8px]">
+        <span className="text-[9px] font-medium text-black-100 max-[480px]:text-[6.5px]">
           50
         </span>
       </div>
@@ -232,6 +291,31 @@ function LULCLegend() {
 
             <span className="text-[10px] text-gray-600 leading-tight max-[480px]:text-[9px]">
               {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SoilLegend({ taxoValues }) {
+  if (!taxoValues || taxoValues.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-3 right-3 z-[1500] bg-white/95 backdrop-blur-sm rounded-md shadow-md border border-gray-200 px-3 py-2 max-w-[220px] max-[480px]:px-2 max-[480px]:py-1.5 max-[480px]:max-w-[160px] max-[480px]:bottom-2 max-[480px]:right-2">
+      <div className="text-[11px] font-semibold text-gray-700 mb-1.5 max-[480px]:text-[9px] max-[480px]:mb-1">
+        Soil Taxonomy
+      </div>
+      <div className="flex flex-col gap-1 max-[480px]:gap-0.5">
+        {taxoValues.map((taxo) => (
+          <div key={taxo} className="flex items-center gap-2 max-[480px]:gap-1.5">
+            <span
+              className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-400 max-[480px]:w-2.5 max-[480px]:h-2.5"
+              style={{ backgroundColor: getSoilColor({ S_TAXO: taxo }) }}
+            />
+            <span className="text-[10px] text-gray-600 leading-tight max-[480px]:text-[8px]">
+              {taxo}
             </span>
           </div>
         ))}
@@ -550,6 +634,16 @@ export default function LandUseLandCover({
   const mapContainerRef = useRef(null);
   const fullscreenContainerRef = useRef(null);
 
+  // Holds the Leaflet zoom control's DOM node so it can be re-parented
+  // into the same flex column as the custom Layers button (see the
+  // reparenting effect below) instead of being positioned with a
+  // separately-guessed pixel offset.
+  const zoomControlContainerRef = useRef(null);
+
+  // Wrapper that holds the custom Layers button AND (once re-parented)
+  // the native Leaflet zoom control, stacked with a fixed flex "gap".
+  const layerControlWrapperRef = useRef(null);
+
   const mapRef = useRef(null);
   const leftLayerRef = useRef(null);
   const rightLayerRef = useRef(null);
@@ -560,6 +654,12 @@ export default function LandUseLandCover({
   const streetLayerRef = useRef(null);
   const satelliteLayerRef = useRef(null);
   const esriSatelliteLayerRef = useRef(null);
+
+  // Soil is rendered on this SAME Leaflet map as LULC and the base map.
+  // There is intentionally no nested SoilMap component anymore.
+  const soilLayerRef = useRef(null);
+  const soilDataRef = useRef(null);
+  const hasFitSoilBoundsRef = useRef(false);
 
   const flyoverLayersRef = useRef([]);
   const flyoverMarkersRef = useRef([]);
@@ -624,6 +724,11 @@ export default function LandUseLandCover({
   const [showLULC, setShowLULC] = useState(false);
 
   const [showSoil, setShowSoil] = useState(false);
+
+  const [soilData, setSoilData] = useState(null);
+  const [soilLoading, setSoilLoading] = useState(true);
+  const [soilError, setSoilError] = useState(null);
+  const [taxoValues, setTaxoValues] = useState([]);
 
   /* ---------------- Data hooks ---------------- */
 
@@ -1262,6 +1367,53 @@ export default function LandUseLandCover({
     }
   }, [availableDates]);
 
+  // Load soil data once. The GeoJSON is rendered on the SAME Leaflet map
+  // used by LULC, so all base-map and map controls remain single/shared.
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSoilData = async () => {
+      try {
+        setSoilLoading(true);
+        setSoilError(null);
+
+        const response = await fetch("/data/Soil.geojson");
+        if (!response.ok) {
+          throw new Error(`Failed to load soil data: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        soilDataRef.current = data;
+        setSoilData(data);
+
+        setTaxoValues(
+          Array.from(
+            new Set(
+              (data.features || [])
+                .map((feature) => feature.properties?.S_TAXO)
+                .filter(Boolean),
+            ),
+          ).sort(),
+        );
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[LULC] Error loading soil data:", err);
+          setSoilError(err.message || "Failed to load soil data");
+        }
+      } finally {
+        if (!cancelled) setSoilLoading(false);
+      }
+    };
+
+    fetchSoilData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (movementPoints && movementPoints.length > 0) {
       log(`Movement Points loaded: ${movementPoints.length} points`);
@@ -1326,6 +1478,37 @@ export default function LandUseLandCover({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Move Leaflet's native zoom control DOM node into the same flex
+  // column as the custom Layers button once the button exists in the
+  // DOM (it only mounts after `loading`/`error` settle). This makes the
+  // gap between them a plain CSS flex "gap" instead of two independently
+  // guessed absolute pixel offsets, so it can't drift out of sync again.
+  // Inserted as the FIRST child so it renders above the Layers button.
+  useEffect(() => {
+    if (loading || error) {
+      return;
+    }
+
+    const zoomEl = zoomControlContainerRef.current;
+    const wrapperEl = layerControlWrapperRef.current;
+
+    if (!zoomEl || !wrapperEl) {
+      return;
+    }
+
+    if (wrapperEl.firstChild !== zoomEl) {
+      wrapperEl.insertBefore(zoomEl, wrapperEl.firstChild);
+    }
+  }, [loading, error]);
+
+  // Injected global styles: focus outline removal only. The gap between
+  // the custom Layers button and Leaflet's native zoom control is no
+  // longer done with a guessed pixel "top" offset (that drifted out of
+  // sync depending on screen size / Leaflet's own default control
+  // spacing). Instead the zoom control's DOM node is physically moved
+  // into the same flex column as the Layers button — see the
+  // "reparenting" effect further below — so the spacing is a real CSS
+  // flex "gap" that can never mismatch.
   useEffect(() => {
     const style = document.createElement("style");
 
@@ -1457,6 +1640,65 @@ export default function LandUseLandCover({
   }, [showLULC, ensureLULCLayersExist]);
 
   /* ==========================================================================
+   * SOIL LAYER - SAME MAP AS LULC
+   * ========================================================================*/
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReadyRef.current) return;
+
+    const map = mapRef.current;
+
+    // Soil is an overlay on this exact map instance. When it is turned off,
+    // remove only the soil GeoJSON; the shared base map and controls stay.
+    if (!showSoil) {
+      if (soilLayerRef.current && map.hasLayer(soilLayerRef.current)) {
+        map.removeLayer(soilLayerRef.current);
+      }
+      soilLayerRef.current = null;
+      hasFitSoilBoundsRef.current = false;
+      return;
+    }
+
+    if (!soilData) return;
+
+    if (soilLayerRef.current && map.hasLayer(soilLayerRef.current)) {
+      map.removeLayer(soilLayerRef.current);
+    }
+
+    soilLayerRef.current = L.geoJSON(soilData, {
+      pane: "soilPane",
+      style: soilStyle,
+      onEachFeature: onEachSoilFeature,
+    }).addTo(map);
+
+    // Match the previous SoilMap behavior: fit to the soil extent the first
+    // time Soil is enabled, but do not create another map instance.
+    if (!hasFitSoilBoundsRef.current) {
+      try {
+        const bounds = soilLayerRef.current.getBounds();
+        if (bounds.isValid()) {
+          map.setView(bounds.getCenter(), DEFAULT_ZOOM, { animate: false });
+          hasFitSoilBoundsRef.current = true;
+        }
+      } catch (err) {
+        console.warn("[LULC] Could not set soil view:", err);
+      }
+    }
+
+    requestAnimationFrame(() => {
+      if (mapRef.current && mapContainerRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    });
+
+    return () => {
+      if (soilLayerRef.current && map.hasLayer(soilLayerRef.current)) {
+        map.removeLayer(soilLayerRef.current);
+      }
+    };
+  }, [showSoil, soilData]);
+
+  /* ==========================================================================
    * INITIALIZE MAP
    * ========================================================================*/
 
@@ -1473,10 +1715,35 @@ export default function LandUseLandCover({
         zoom: DEFAULT_ZOOM,
         minZoom: MIN_ZOOM,
         maxZoom: MAX_ZOOM,
-        zoomControl: true,
+        zoomControl: false,
         attributionControl: false,
         fadeAnimation: true,
       });
+
+      // Add Leaflet zoom control manually. Its DOM node gets moved into
+      // the same flex column as the custom Layers button once that
+      // button exists in the DOM (see the reparenting effect below) —
+      // that's what actually controls the gap between them now, not a
+      // guessed pixel offset here.
+      const zoomControl = L.control
+        .zoom({
+          position: "topleft",
+        })
+        .addTo(map);
+
+      const zoomControlContainer = zoomControl.getContainer();
+
+      if (zoomControlContainer) {
+        // Take it out of absolute/floated Leaflet control positioning so
+        // it behaves like a normal flex child once re-parented — no
+        // "top"/"left" needed, the wrapper's flex layout places it.
+        zoomControlContainer.style.setProperty("position", "static", "important");
+        zoomControlContainer.style.setProperty("margin", "0", "important");
+        zoomControlContainer.style.setProperty("float", "none", "important");
+        zoomControlContainer.style.setProperty("clear", "none", "important");
+
+        zoomControlContainerRef.current = zoomControlContainer;
+      }
 
       const streetLayer = L.tileLayer(
         "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
@@ -1524,6 +1791,10 @@ export default function LandUseLandCover({
 
       mapRef.current = map;
       isMapReadyRef.current = true;
+
+      map.createPane("soilPane");
+      map.getPane("soilPane").style.zIndex = 300;
+      map.getPane("soilPane").style.pointerEvents = "auto";
 
       map.createPane("movementPane");
 
@@ -1605,6 +1876,13 @@ export default function LandUseLandCover({
         resizeObserverRef.current?.disconnect();
 
         sideBySideRef.current = null;
+
+        if (soilLayerRef.current && mapRef.current?.hasLayer(soilLayerRef.current)) {
+          mapRef.current.removeLayer(soilLayerRef.current);
+        }
+        soilLayerRef.current = null;
+        soilDataRef.current = null;
+        hasFitSoilBoundsRef.current = false;
 
         leftLayerRef.current = null;
 
@@ -1773,50 +2051,28 @@ export default function LandUseLandCover({
          * LEAFLET MAP
          *
          * IMPORTANT:
-         * The Tailwind arbitrary descendant selectors below position the
-         * native Leaflet zoom control in the same place on desktop/mobile.
-         *
-         * Layer button:
-         *   top: 8px
-         *   left: 8px
-         *
-         * Layer button height:
-         *   34px
-         *
-         * Zoom control:
-         *   top: 46px
-         *
-         * Therefore the gap is approximately 4px.
+         * The native Leaflet zoom control is re-parented (see the
+         * "reparenting" effect above, right after the resize listener)
+         * into the SAME wrapper div as the custom Layers button below,
+         * which is a flex column with a small `gap`. The zoom control's
+         * position is therefore just "next flex item down" — a real,
+         * fixed CSS gap — rather than two separately guessed absolute
+         * pixel offsets that can drift apart on different screens.
          * ================================================================ */}
 
-        <div
-          ref={mapContainerRef}
-          className="
-            absolute inset-0
-            [&_.leaflet-control-zoom]:!mt-[46px]
-            [&_.leaflet-control-zoom]:!ml-2
-          "
-        />
-
-        {/* ----------------------------------------------------------------
-         * SOIL MAP
-         * -------------------------------------------------------------- */}
-
-        {showSoil && (
-          <div className="absolute inset-0 z-[1000] bg-white">
-            <SoilMap isActive={showSoil} />
-          </div>
-        )}
+        <div ref={mapContainerRef} className="absolute inset-0" />
 
         {/* ----------------------------------------------------------------
          * LEGENDS
          * -------------------------------------------------------------- */}
 
-        {!loading && !error && !showSoil && (
+        {!loading && !error && !soilError && (
           <>
-            {showLULC && <LULCLegend />}
+            {!showSoil && showLULC && <LULCLegend />}
 
-            {showVelocityUI && <VelocityLegend />}
+            {!showSoil && showVelocityUI && <VelocityLegend />}
+
+            {showSoil && !soilLoading && <SoilLegend taxoValues={taxoValues} />}
           </>
         )}
 
@@ -1832,25 +2088,33 @@ export default function LandUseLandCover({
         </div>
 
         {/* ----------------------------------------------------------------
-         * CUSTOM LAYER BUTTON
+         * CUSTOM LAYER BUTTON + (re-parented) ZOOM CONTROL
          *
-         * IMPORTANT:
-         * Previously this control used a different top value on mobile.
-         * It is now always:
-         *
-         *   top-2
-         *   left-2
-         *
-         * So desktop and mobile use exactly the same position.
+         * This wrapper is a flex column pinned at top-2/left-2. Its first
+         * child is the custom Layers button below; its second child is
+         * Leaflet's native zoom control, appended here at runtime by the
+         * reparenting effect once this div exists in the DOM. The `gap`
+         * class is the ONLY thing controlling the space between them —
+         * on both desktop and mobile — so it can't get out of sync again.
          * -------------------------------------------------------------- */}
 
         {!loading && !error && (
-          <div className="absolute top-2 left-2 z-[1500]">
+          <div
+            ref={layerControlWrapperRef}
+            className="absolute top-2 left-2 z-[1500] flex flex-col items-start gap-1 max-[480px]:gap-0.5"
+          >
+            {/* Inner wrapper so the dropdown panel below anchors to the
+                BUTTON itself (via `relative` here), not to whichever end
+                of the outer flex column the button happens to be at.
+                That keeps the panel opening level with the button even
+                if the zoom control is re-ordered above/below it. */}
+            <div className="relative">
             <button
               onClick={() => setIsLayerPanelOpen(!isLayerPanelOpen)}
               className={`
                   flex items-center justify-center
                   w-[34px] h-[34px]
+                  max-[480px]:w-[28px] max-[480px]:h-[28px]
                   bg-white
                   rounded-[4px]
                   border-2
@@ -1870,7 +2134,7 @@ export default function LandUseLandCover({
               }}
               aria-label="Toggle layer control"
             >
-              <Layers size={20} />
+              <Layers size={20} className="max-[480px]:w-4 max-[480px]:h-4" />
             </button>
 
             {/* ----------------------------------------------------------
@@ -1998,6 +2262,7 @@ export default function LandUseLandCover({
                 </div>
               </div>
             )}
+            </div>
           </div>
         )}
 
@@ -2048,7 +2313,7 @@ export default function LandUseLandCover({
          * LOADING
          * -------------------------------------------------------------- */}
 
-        {(loading || flyoversLoading || movementLoading) && (
+        {(loading || flyoversLoading || movementLoading || (showSoil && soilLoading)) && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm z-[500]">
             <div className="flex flex-col items-center gap-2 bg-white px-5 py-4 rounded-xl shadow-lg border border-gray-200 max-[480px]:px-3 max-[480px]:py-3">
               <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin max-[480px]:w-6 max-[480px]:h-6" />
@@ -2056,9 +2321,11 @@ export default function LandUseLandCover({
               <p className="text-xs text-gray-500 max-[480px]:text-[10px] text-center">
                 {loading
                   ? "Initializing map..."
-                  : movementLoading
-                    ? "Loading movement points..."
-                    : "Loading flyover data..."}
+                  : showSoil && soilLoading
+                    ? "Loading soil data..."
+                    : movementLoading
+                      ? "Loading movement points..."
+                      : "Loading flyover data..."}
               </p>
             </div>
           </div>
@@ -2068,14 +2335,14 @@ export default function LandUseLandCover({
          * ERROR
          * -------------------------------------------------------------- */}
 
-        {(error || movementError) && (
+        {(error || movementError || soilError) && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center gap-2 shadow-lg max-w-md max-[480px]:text-xs max-[480px]:px-3 max-[480px]:py-2 max-[480px]:max-w-[90%]">
             <AlertTriangle
               size={16}
               className="flex-shrink-0 max-[480px]:w-3.5 max-[480px]:h-3.5"
             />
 
-            <span>{error || movementError}</span>
+            <span>{error || movementError || soilError}</span>
           </div>
         )}
 

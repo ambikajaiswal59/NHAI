@@ -92,7 +92,11 @@ function SoilLegend({ taxoValues }) {
     );
 }
 
-export default function SoilMap({ mapCenter = DEFAULT_SOIL_MAP_CENTER, isActive = true }) {
+export default function SoilMap({
+    mapCenter = DEFAULT_SOIL_MAP_CENTER,
+    isActive = true,
+    baseLayer: externalBaseLayer = "streets",
+}) {
 
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
@@ -115,7 +119,7 @@ export default function SoilMap({ mapCenter = DEFAULT_SOIL_MAP_CENTER, isActive 
     // Layer Control States
     const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false);
     const [activeLayers, setActiveLayers] = useState(['flyover']);
-    const [baseLayer, setBaseLayer] = useState('streets');
+    const [baseLayer, setBaseLayer] = useState(externalBaseLayer);
 
     // Mobile state
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -178,6 +182,17 @@ export default function SoilMap({ mapCenter = DEFAULT_SOIL_MAP_CENTER, isActive 
             console.error("[SoilMap] Error switching base layer:", err);
         }
     }, []);
+
+    // Keep the SoilMap base layer synchronized with the parent
+    // LandUseLandCover base-map selection. The parent map and SoilMap
+    // are separate Leaflet instances, so changing the parent's radio
+    // buttons must explicitly switch the SoilMap's tile layers too.
+    useEffect(() => {
+        if (!externalBaseLayer || externalBaseLayer === baseLayer) return;
+
+        setBaseLayer(externalBaseLayer);
+        handleBaseLayerChange(externalBaseLayer);
+    }, [externalBaseLayer, baseLayer, handleBaseLayerChange]);
 
     // Update layer visibility based on active layers
     const updateLayerVisibility = useCallback(() => {
@@ -445,8 +460,12 @@ export default function SoilMap({ mapCenter = DEFAULT_SOIL_MAP_CENTER, isActive 
             streetLayerRef.current = streetLayer;
             satelliteLayerRef.current = satelliteLayer;
 
-            // Add Google Streets as base (default)
-            streetLayer.addTo(map);
+            // Add the currently selected base map.
+            if (externalBaseLayer === 'satellite') {
+                satelliteLayer.addTo(map);
+            } else {
+                streetLayer.addTo(map);
+            }
 
             // Add Soil Layer
             if (soilDataRef.current) {
