@@ -128,12 +128,12 @@ export function getPointDetailFields(point) {
 // radius + its white border + its drop shadow all fit inside the
 // canvas without being clipped by the top edge — that clipping is what
 // was making the icons look "cut off" instead of a full circular ring.
-const PIN_RADIUS = 14;
+const PIN_RADIUS = 12;
 const PIN_BORDER_WIDTH = 3;
 const PIN_SHADOW_BLUR = 6;
 const PIN_SHADOW_OFFSET_Y = 2;
 const TOP_PADDING = PIN_RADIUS + PIN_BORDER_WIDTH / 2 + PIN_SHADOW_BLUR + PIN_SHADOW_OFFSET_Y + 4; // ~29, rounded below
-const LABEL_GAP = 6; // gap between the bottom of the pin ring and the label box
+const LABEL_GAP = 4; // gap between the bottom of the pin ring and the label box
 
 /**
  * Helper: Draw rounded rectangle on canvas
@@ -160,17 +160,17 @@ function roundRect(ctx, x, y, w, h, r) {
  * to render without being clipped by the canvas edge.
  */
 function drawPin(ctx, color, pinX, pinY) {
-  const radius = PIN_RADIUS;
+  const pinRadius = 13;
 
   // Pin shadow
   ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = PIN_SHADOW_BLUR;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = PIN_SHADOW_OFFSET_Y;
 
   // Main circle
   ctx.beginPath();
-  ctx.arc(pinX, pinY, radius, 0, Math.PI * 2);
+  ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
@@ -180,31 +180,18 @@ function drawPin(ctx, color, pinX, pinY) {
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
 
-  // White border (the "ring") — full stroke, no clipping
+  // White border (the "ring")
   ctx.beginPath();
   ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Pin icon (simplified pin shape)
-  ctx.fillStyle = "white";
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 2;
-
-  // Draw pin icon
+  // Inner white dot
   ctx.beginPath();
   ctx.arc(pinX, pinY, 4, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.fill();
-  ctx.stroke();
-
-  // Inner circle
-  ctx.beginPath();
-  ctx.arc(pinX, pinY + 1, 3, 0, Math.PI * 2);
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 2;
-  ctx.stroke();
 }
 
 /**
@@ -223,12 +210,12 @@ function drawLabel(
     ctx.font = "800 10px Arial, sans-serif";
     const textWidth = ctx.measureText(labelText).width;
     const padding = 2;
-    const labelWidth = textWidth + padding * 4 + 4;
+    const labelWidth = textWidth + padding * 2 + 2;
     const labelY = pinY - labelHeight / 2; // vertically centered on pin
 
     ctx.shadowColor = "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = 3;
-    ctx.shadowOffsetX = 0;
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 1;
     ctx.shadowOffsetY = 1;
 
     ctx.fillStyle = "white";
@@ -283,7 +270,7 @@ export function createUnifiedMarkerIcon({
   name = "",
   detailFields = [],
 }) {
-  const pinRadius = 14;
+  const pinRadius = 13;
   const pinDiameter = pinRadius * 2;
   const gap = 4;
   const labelHeight = detailed ? 20 + detailFields.length * 14 : 18;
