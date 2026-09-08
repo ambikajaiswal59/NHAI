@@ -200,49 +200,110 @@ function drawPin(ctx, color, pinX, pinY) {
 function drawLabel(
   ctx,
   { color, labelText, detailed, name, detailFields = [] },
-  labelX,
-  pinY,
-  labelHeight,
+  layout,
 ) {
   if (detailed) {
-    // ... detailed layout logic stays same, just positioned at labelX / pinY - labelHeight/2
-  } else if (labelText) {
-    ctx.font = "800 10px Arial, sans-serif";
-    const textWidth = ctx.measureText(labelText).width;
-    const padding = 2;
-    const labelWidth = textWidth + padding * 2 + 2;
-    const labelY = pinY - labelHeight / 2; // vertically centered on pin
+    const { cardX, cardY, cardWidth, cardHeight, padding } = layout;
 
-    ctx.shadowColor = "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = 2;
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 1;
+    // Card shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.25)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2;
 
-    ctx.fillStyle = "white";
+    // Card background
+    ctx.fillStyle = 'white';
     ctx.beginPath();
-    roundRect(ctx, labelX, labelY, labelWidth, labelHeight, 5);
+    roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8);
     ctx.fill();
 
-    ctx.shadowColor = "transparent";
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    ctx.strokeStyle = color + "55";
+    // Card border
+    ctx.strokeStyle = color + '55';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    roundRect(ctx, labelX, labelY, labelWidth, labelHeight, 5);
+    roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8);
     ctx.stroke();
 
-    ctx.fillStyle = "#1f2937";
-    ctx.font = "600 10px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(labelText, labelX + labelWidth / 2, labelY + labelHeight / 2);
+    // Top accent line
+    ctx.beginPath();
+    ctx.moveTo(cardX, cardY);
+    ctx.lineTo(cardX + cardWidth, cardY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-    return labelWidth; // caller needs this to size the canvas
+    // Name
+    if (name) {
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 12px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(name, cardX + padding, cardY + padding + 2);
+    }
+
+    // Detail fields
+    const fieldStartY = name ? cardY + padding + 20 : cardY + padding + 4;
+    detailFields.forEach((field, index) => {
+      const y = fieldStartY + index * 14;
+
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '600 9px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(field.label, cardX + padding, y);
+
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '600 10px Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(field.value, cardX + cardWidth - padding, y);
+    });
+    return;
   }
-  return 0;
+
+  // Non-detailed: compact pill to the RIGHT of the pin (unchanged from
+  // your current right-side layout)
+  if (!labelText) return;
+  const { labelX, pinY, labelHeight } = layout;
+
+  ctx.font = "800 10px Arial, sans-serif";
+  const textWidth = ctx.measureText(labelText).width;
+  const padding = 2;
+  const labelWidth = textWidth + padding * 2 + 2;
+  const labelY = pinY - labelHeight / 2;
+
+  ctx.shadowColor = "rgba(0,0,0,0.2)";
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
+
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  roundRect(ctx, labelX, labelY, labelWidth, labelHeight, 5);
+  ctx.fill();
+
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+
+  ctx.strokeStyle = color + "55";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  roundRect(ctx, labelX, labelY, labelWidth, labelHeight, 5);
+  ctx.stroke();
+
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "600 10px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(labelText, labelX + labelWidth / 2, labelY + labelHeight / 2);
 }
 
 /**
@@ -271,11 +332,41 @@ export function createUnifiedMarkerIcon({
   detailFields = [],
 }) {
   const pinRadius = 13;
-  const pinDiameter = pinRadius * 2;
-  const gap = 4;
-  const labelHeight = detailed ? 20 + detailFields.length * 14 : 18;
 
-  // Measure text first to size the canvas correctly
+  if (detailed) {
+    // Wide card BELOW the pin — same layout family as the original.
+    const cardWidth = 240;
+    const padding = 6;
+    const cardHeight = 26 + detailFields.length * 14;
+
+    const pinX = cardWidth / 2;
+    const pinY = pinRadius + 6;
+    const cardX = padding;
+    const cardY = pinY + pinRadius + 6; // gap below pin
+    const width = cardWidth;
+    const height = cardY + cardHeight;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+    ctx.clearRect(0, 0, width, height);
+
+    drawPin(ctx, color, pinX, pinY);
+    drawLabel(
+      ctx,
+      { color, labelText, detailed, name, detailFields },
+      { cardX, cardY, cardWidth: width - padding * 2, cardHeight, padding },
+    );
+
+    return { dataUrl: canvas.toDataURL("image/png"), width, height, pinX, pinY, pinRadius };
+  }
+
+  // Non-detailed: pin LEFT, compact label RIGHT (your current layout)
+  const gap = 4;
+  const labelHeight = 18;
+
   const measureCanvas = document.createElement("canvas");
   const mctx = measureCanvas.getContext("2d");
   mctx.font = "800 10px Arial, sans-serif";
@@ -283,8 +374,8 @@ export function createUnifiedMarkerIcon({
   const padding = 3;
   const labelWidth = labelText ? textWidth + padding * 4 + 4 : 0;
 
-  const pinX = pinRadius + 4; // small left padding
-  const pinY = Math.max(pinRadius + 4, labelHeight / 2 + 2); // center pin so label fits vertically
+  const pinX = pinRadius + 4;
+  const pinY = Math.max(pinRadius + 4, labelHeight / 2 + 2);
 
   const width = pinX + pinRadius + (labelText ? gap + labelWidth : 0) + 6;
   const height = Math.max(pinY + pinRadius + 6, labelHeight + 4);
@@ -294,32 +385,19 @@ export function createUnifiedMarkerIcon({
   canvas.height = height * 2;
   const ctx = canvas.getContext("2d");
   ctx.scale(2, 2);
-
   ctx.clearRect(0, 0, width, height);
 
-  // Draw pin first (left side)
   drawPin(ctx, color, pinX, pinY);
 
-  // Draw label to the right, vertically centered on the pin
   const labelX = pinX + pinRadius + gap;
   drawLabel(
     ctx,
     { color, labelText, detailed, name, detailFields },
-    labelX,
-    pinY,
-    labelHeight,
+    { labelX, pinY, labelHeight },
   );
 
-  return {
-    dataUrl: canvas.toDataURL("image/png"),
-    width,
-    height,
-    pinX,
-    pinY,
-    pinRadius,
-  };
+  return { dataUrl: canvas.toDataURL("image/png"), width, height, pinX, pinY, pinRadius };
 }
-
 // ============================================================
 // LEAFLET ICON - Uses the unified canvas generator
 // ============================================================
