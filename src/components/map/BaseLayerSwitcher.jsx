@@ -9,8 +9,13 @@ const BASE_LAYERS = [
   },
   {
     id: "satellite",
-    name: "Satellite",
+    name: "Google Satellite",
     url: "https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+  },
+  {
+    id: "esri_satellite",
+    name: "Esri Satellite",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   },
 ];
 
@@ -67,7 +72,7 @@ export default function BaseLayerSwitcher({ activeLayer, onSelect }) {
           className={`
             absolute top-0 left-full ml-2
             bg-white rounded-[4px] border-2 border-gray-300
-            p-3 min-w-[110px] max-w-[130px]
+            p-3 min-w-[130px] max-w-[150px]
             shadow-lg
           `}
           style={{
@@ -104,13 +109,11 @@ export default function BaseLayerSwitcher({ activeLayer, onSelect }) {
                     checked={activeLayer === layer.id}
                     onChange={() => {
                       onSelect(layer.id);
-
                     }}
                     className="w-3.5 h-3.5 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
                   />
                   <span className="flex items-center gap-1.5">
                     {layer.name}
-
                   </span>
                 </label>
               ))}
