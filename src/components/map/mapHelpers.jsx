@@ -121,6 +121,20 @@ export function getPointDetailFields(point) {
 // UNIFIED CANVAS ICON GENERATOR - Works for BOTH Leaflet & Google Maps
 // ============================================================
 
+// --- Pin geometry constants -----------------------------------------
+// These control how the circular pin is drawn on the canvas.
+// TOP_PADDING is the distance from the top edge of the canvas to the
+// CENTER of the pin circle. It must be large enough that the circle's
+// radius + its white border + its drop shadow all fit inside the
+// canvas without being clipped by the top edge — that clipping is what
+// was making the icons look "cut off" instead of a full circular ring.
+const PIN_RADIUS = 14;
+const PIN_BORDER_WIDTH = 3;
+const PIN_SHADOW_BLUR = 6;
+const PIN_SHADOW_OFFSET_Y = 2;
+const TOP_PADDING = PIN_RADIUS + PIN_BORDER_WIDTH / 2 + PIN_SHADOW_BLUR + PIN_SHADOW_OFFSET_Y + 4; // ~29, rounded below
+const LABEL_GAP = 6; // gap between the bottom of the pin ring and the label box
+
 /**
  * Helper: Draw rounded rectangle on canvas
  */
@@ -140,20 +154,23 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 /**
- * Draw the pin icon on canvas
+ * Draw the pin icon on canvas — a full circular ring (colored fill +
+ * white border) with a small white dot in the center. Uses PIN_RADIUS /
+ * PIN_BORDER_WIDTH / PIN_SHADOW_BLUR so the whole ring always has room
+ * to render without being clipped by the canvas edge.
  */
 function drawPin(ctx, color, pinX, pinY) {
-  const pinRadius = 14;
+  const radius = PIN_RADIUS;
 
   // Pin shadow
   ctx.shadowColor = "rgba(0,0,0,0.35)";
   ctx.shadowBlur = 6;
   ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowOffsetY = PIN_SHADOW_OFFSET_Y;
 
-  // Pin circle
+  // Main circle
   ctx.beginPath();
-  ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
+  ctx.arc(pinX, pinY, radius, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
@@ -163,7 +180,7 @@ function drawPin(ctx, color, pinX, pinY) {
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
 
-  // Pin border
+  // White border (the "ring") — full stroke, no clipping
   ctx.beginPath();
   ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
   ctx.strokeStyle = "white";
@@ -177,11 +194,8 @@ function drawPin(ctx, color, pinX, pinY) {
 
   // Draw pin icon
   ctx.beginPath();
-  ctx.moveTo(pinX, pinY - 5);
-  ctx.quadraticCurveTo(pinX + 5, pinY - 1, pinX + 5, pinY + 3);
-  ctx.quadraticCurveTo(pinX + 5, pinY + 5, pinX, pinY + 7);
-  ctx.quadraticCurveTo(pinX - 5, pinY + 5, pinX - 5, pinY + 3);
-  ctx.quadraticCurveTo(pinX - 5, pinY - 1, pinX, pinY - 5);
+  ctx.arc(pinX, pinY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
   ctx.fill();
   ctx.stroke();
 
@@ -242,6 +256,20 @@ function drawLabel(
     return labelWidth; // caller needs this to size the canvas
   }
   return 0;
+}
+
+/**
+ * Compute the total canvas height needed for a given icon configuration,
+ * and the y-position where the label box should start. Centralized here
+ * so createUnifiedMarkerIcon, makeFlyoverIcon, and createGoogleMapsMarkerIcon
+ * always agree on the same layout.
+ */
+function getIconLayout({ detailed, detailFields = [] }) {
+  const labelStartY = TOP_PADDING + PIN_RADIUS + LABEL_GAP;
+  const height = detailed
+    ? labelStartY + 26 + detailFields.length * 14
+    : labelStartY + 18 + 8;
+  return { labelStartY, height };
 }
 
 /**
