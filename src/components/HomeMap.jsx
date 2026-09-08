@@ -43,6 +43,7 @@ import {
   FitToVisibleFlyovers,
   getFlyoverColor,
   getFlyoverDisplayName,
+  formatPointName,
 } from "./map/mapHelpers";
 import StatsOverview from "./StatsOverview";
 
@@ -134,25 +135,28 @@ export default function HomeMap() {
   const [idwLayer, setIdwLayer] = useState(null);
   const idwLayerRef = useRef(null);
   const [bufferBoundary, setBufferBoundary] = useState(null);
-  const preRenderStartedRef = useRef(false); // ✅ Track if pre-rendering has started
-
+  const preRenderStartedRef = useRef(false); 
   const mapWrapperRef = useRef(null);
   const mapRef = useRef(null);
 
-  const flyoverMarkers = useMemo(() => {
-    const markers = flyoversList.map((flyover, index) => {
-      const color = getFlyoverColor(index);
-      const displayName = getFlyoverDisplayName(flyover.type, index);
+const flyoverMarkers = useMemo(() => {
+  const markers = flyoversList.map((flyover, index) => {
+    const color = getFlyoverColor(index);
 
-      return {
-        ...flyover,
-        color: color,
-        displayName: displayName,
-      };
-    });
+    const firstPoint = flyover.namedPoints?.[0];
+    const displayName = firstPoint
+      ? formatPointName(firstPoint.name)
+      : getFlyoverDisplayName(flyover.type, index);
 
-    return markers;
-  }, [flyoversList]);
+    return {
+      ...flyover,
+      color: color,
+      displayName: displayName,
+    };
+  });
+
+  return markers;
+}, [flyoversList]);
   const visibleFlyoversFitData = useMemo(() => {
     const visible = flyoverMarkers.filter((f) => visibleFlyoverIds.has(f.id));
     if (visible.length === 0) return null;
@@ -344,9 +348,8 @@ export default function HomeMap() {
     const property = propertyMap[idwLayer];
     if (!property) return;
 
-    // ✅ If layer exists, update it
     if (idwLayerRef.current) {
-      console.log("🔄 Updating existing IDW layer for month:", selectedMonth);
+      //console.log("🔄 Updating existing IDW layer for month:", selectedMonth);
       try {
         idwLayerRef.current.updateData(
           currentData,
@@ -359,9 +362,7 @@ export default function HomeMap() {
       return;
     }
 
-    // ✅ CREATE NEW LAYER
-    console.log("🎨 Creating NEW IDW layer for:", idwLayer);
-
+   
     (async () => {
       try {
         const newLayer = createIDWLayer(currentData, property, {
@@ -372,8 +373,6 @@ export default function HomeMap() {
           propertyMap: propertyMap,
         });
 
-        // ✅ Pre-render current month first
-        console.log("⏳ Pre-rendering current month before adding to map...");
         const currentMonthData =
           allMonthlyData?.filter(
             (item) =>
@@ -386,17 +385,14 @@ export default function HomeMap() {
           idwLayer,
           propertyMap,
         );
-        console.log("✅ Current month pre-rendered — adding layer to map now");
 
-        // ✅ ADD LAYER TO MAP
         if (!mapRef.current) return;
         newLayer.addTo(mapRef.current);
         idwLayerRef.current = newLayer;
 
-        // ✅ Pre-render remaining months in background
         if (allMonthlyData?.length && !preRenderStartedRef.current) {
           preRenderStartedRef.current = true;
-          console.log("🔥 Background pre-rendering ALL layers × ALL months...");
+
 
           newLayer
             .preRenderAllLayers(
