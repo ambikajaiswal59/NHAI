@@ -173,19 +173,44 @@ export const fetchMovementPointById = async (pointId) => {
   }
 };
 
-
-
-
 // --- Mock auth block — remove once the real /auth/login endpoint exists ---
 // const MOCK_CREDENTIALS = {
 //   username: "admin",
 //   password: "nhai@2026",
 // };
 
+export const loginUser = async ({ username, password }) => {
+  try {
+    const params = new URLSearchParams({ username, password });
+
+    const response = await fetch(`${BASE_URL}/login?${params.toString()}`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const error = new Error(body.detail || `HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      error.detail = body.detail;
+      throw error;
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error logging in:", error);
+    throw error;
+  }
+};
+
 // export const loginUser = async ({ username, password }) => {
+//   const MOCK_CREDENTIALS = {
+//     username: "admin",
+//     password: "nhai@2026",
+//   };
+
 //   try {
 //     const params = new URLSearchParams({ username, password });
-
 //     const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
 //       method: "POST",
 //     });
@@ -197,22 +222,55 @@ export const fetchMovementPointById = async (pointId) => {
 //     const data = await response.json();
 //     return data;
 //   } catch (error) {
-//     console.error("Error logging in:", error);
-//     throw error;
+//     console.warn("Backend unreachable, using mock auth", error);
+
+//     // Mock authentication
+//     if (username === MOCK_CREDENTIALS.username && password === MOCK_CREDENTIALS.password) {
+//       return {
+//         success: true,
+//         user: {
+//           username: "admin",
+//           role: "admin",
+//           token: "mock-jwt-token-12345"
+//         }
+//       };
+//     } else {
+//       throw new Error("Invalid username or password");
+//     }
 //   }
 // };
 
-
-
-export const loginUser = async ({ username, password }) => {
-  const MOCK_CREDENTIALS = {
-    username: "admin",
-    password: "nhai@2026",
-  };
+export const logoutUser = async () => {
+  const token = sessionStorage.getItem("authToken"); // ✅ matches Login.jsx
 
   try {
-    const params = new URLSearchParams({ username, password });
-    const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
+    const response = await fetch(`${AUTH_BASE_URL}/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json().catch(() => ({}));
+  } finally {
+    sessionStorage.removeItem("authToken");
+    sessionStorage.removeItem("authUser");
+  }
+};
+
+export const changePassword = async ({ username, newPassword }) => {
+  try {
+    const params = new URLSearchParams({
+      username,
+      new_password: newPassword,
+    });
+
+    const response = await fetch(`${BASE_URL}/change_password?${params.toString()}`, {
       method: "POST",
     });
 
@@ -220,23 +278,28 @@ export const loginUser = async ({ username, password }) => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
-    console.warn("Backend unreachable, using mock auth", error);
+    console.error("Error changing password:", error);
+    throw error;
+  }
+};
 
-    // Mock authentication
-    if (username === MOCK_CREDENTIALS.username && password === MOCK_CREDENTIALS.password) {
-      return {
-        success: true,
-        user: {
-          username: "admin",
-          role: "admin",
-          token: "mock-jwt-token-12345"
-        }
-      };
-    } else {
-      throw new Error("Invalid username or password");
+export const forceLogoutUser = async (username) => {
+  try {
+    const params = new URLSearchParams({ username });
+
+    const response = await fetch(`${BASE_URL}/force_logout?${params.toString()}`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    return await response.json().catch(() => ({}));
+  } catch (error) {
+    console.error("Error force logging out:", error);
+    throw error;
   }
 };

@@ -7,8 +7,12 @@ import {
   LogOut,
   Settings,
   Shield,
+  KeyRound,
+  X,
 } from "lucide-react";
 import NHAILOGO from "../assets/NHAILOGO.png";
+import { logoutUser } from "../../src/services/api.js";
+import ChangePasswordForm from "./ChangePasswordForm"; // adjust path to wherever you saved it
 
 const getTodayString = () => {
   const today = new Date();
@@ -34,13 +38,14 @@ const Header = ({ only, onLogout, user } = {}) => {
   const [currentTime, setCurrentTime] = useState(getCurrentTimeString());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState({ top: 0, left: 0 });
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false); // NEW
 
   const dateInputRef = useRef(null);
   const userButtonRef = useRef(null);
-  const menuRef = useRef(null); // ref for the portal-rendered dropdown menu
+  const menuRef = useRef(null);
 
   const displayName = user?.name || user?.username || "Admin User";
-  const displayEmail = user?.email ;
+  const displayEmail = user?.email;
   const displayRole = user?.role
     ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
     : "NHAI HQ";
@@ -83,17 +88,25 @@ const Header = ({ only, onLogout, user } = {}) => {
     setIsUserMenuOpen((prev) => !prev);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsUserMenuOpen(false);
-    onLogout?.();
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.error("Error logging out:", err);
+    } finally {
+      onLogout?.();
+    }
+  };
+
+  // NEW: open modal, close dropdown menu
+  const handleOpenChangePassword = () => {
+    setIsUserMenuOpen(false);
+    setIsChangePasswordOpen(true);
   };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // The menu is rendered via a portal into document.body, so it lives
-      // outside userButtonRef's DOM subtree. Without also checking menuRef,
-      // mousedown on any menu item (including Log Out) gets treated as an
-      // "outside click," closing the menu before the click handler fires.
       if (
         userButtonRef.current &&
         !userButtonRef.current.contains(event.target) &&
@@ -117,7 +130,6 @@ const Header = ({ only, onLogout, user } = {}) => {
   return (
     <div className="w-full bg-[#1366D9] select-none font-sans">
       <div className="relative w-full min-w-[1020px] h-[100px] pb-1.5 bg-[#1366D9] flex items-center shadow-lg max-[900px]:min-w-0 max-[900px]:flex-col max-[900px]:h-auto">
-        {/* ================= 1. LEFT SECTION (NHAI LOGO) ================= */}
         {showLogo && (
           <div className="relative z-10 h-full -mr-8 pr-12 flex items-center mt-3 ml-1 gap-3 shrink-0 bg-[#EEF4FA] max-[900px]:w-full max-[900px]:mr-0 max-[900px]:justify-center max-[900px]:h-auto max-[900px]:py-3">
             <div className="flex items-center gap-2 max-[900px]:gap-2">
@@ -137,14 +149,12 @@ const Header = ({ only, onLogout, user } = {}) => {
                 </p>
               </div>
             </div>
-
             <div className="h-10 bg-gradient-to-b from-transparent via-gray-300/80 to-transparent  mr-2 max-[900px]:hidden" />
           </div>
         )}
 
         {showRest && (
           <>
-            {/* ================= 2. MIDDLE SECTION (WHITE OVERLAY) ================= */}
             <div className="relative z-20 flex-1 h-full mt-3 shadow-[-10px_0_20px_rgba(0,0,0,0.08)] bg-white flex flex-col justify-center pl-2 pr-5  rounded-bl-[125px] rounded-br-[150px] rounded-tr-[450px] shadow-[-8px_0_18px_-2px_rgba(0,0,0,0.07)] [clip-path:polygon(0_0,calc(100%_-_250px)_0,100%_160%,0_100%)] max-[900px]:w-full max-[900px]:ml-0 max-[900px]:h-auto max-[900px]:py-4 max-[900px]:px-5 max-[900px]:[clip-path:none] max-[900px]:rounded-none max-[900px]:items-center">
               <h2 className="text-[#0F172A] w-full font-extrabold text-xl  tracking-tight leading-none max-[900px]:text-center max-[900px]:leading-snug max-[480px]:text-base">
                 AI Risk Intelligence & Remote Monitoring System
@@ -165,7 +175,6 @@ const Header = ({ only, onLogout, user } = {}) => {
               </div>
             </div>
 
-            {/* ================= 3. RIGHT SECTION ================= */}
             <div className="relative z-30 h-[50%] rounded-[16px] shadow-[-10px_0_20px_rgba(0,0,0,0.08)] bg-white bg-[#EEF4FA]  mx-3 my-3 px-5 py-5 -ml-20  flex items-center gap-6 shrink-0 max-[1024px]:px-8 max-[1024px]:gap-4 max-[900px]:w-full max-[900px]:ml-0 max-[900px]:mt-0 max-[900px]:h-auto max-[900px]:rounded-none max-[900px]:justify-center max-[900px]:flex-wrap max-[900px]:px-4 max-[900px]:py-3 max-[480px]:gap-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-3.5 h-3.5 bg-[#22C55E] rounded-full inline-block animate-pulse"></span>
@@ -179,7 +188,6 @@ const Header = ({ only, onLogout, user } = {}) => {
                 </div>
               </div>
 
-              {/* Date & Time — read-only display, no manual selection */}
               <div className="flex items-center gap-2.5 p-1.5 rounded-lg">
                 <Calendar className="w-5 h-5 text-[#0F172A] stroke-[2.2]" />
                 <div className="text-left">
@@ -204,7 +212,7 @@ const Header = ({ only, onLogout, user } = {}) => {
                   <div className="text-xs font-bold text-[#0F172A] leading-tight">
                     {displayName}
                   </div>
-                   <p className="text-[10px] text-gray-500">{displayEmail}</p>
+
                   <div className="text-[10px] text-gray-500 font-semibold leading-tight">
                     NHAI HQ
                   </div>
@@ -233,18 +241,14 @@ const Header = ({ only, onLogout, user } = {}) => {
               <p className="text-[10px] text-gray-500">{displayEmail}</p>
             </div>
 
+            {/* NEW: Change Password menu item */}
             <div className="py-1">
-              <button className="w-full px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-medium">
-                <User className="w-4 h-4 text-gray-500" />
-                Profile Details
-              </button>
-              <button className="w-full px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-medium">
-                <Shield className="w-4 h-4 text-gray-500" />
-                Role & Permissions
-              </button>
-              <button className="w-full px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-medium">
-                <Settings className="w-4 h-4 text-gray-500" />
-                System Settings
+              <button
+                onClick={handleOpenChangePassword}
+                className="w-full px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-medium"
+              >
+                <KeyRound className="w-4 h-4 text-gray-500" />
+                Change Password
               </button>
             </div>
 
@@ -256,6 +260,29 @@ const Header = ({ only, onLogout, user } = {}) => {
                 <LogOut className="w-4 h-4 text-red-600" />
                 Log Out
               </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* NEW: Change Password modal */}
+      {isChangePasswordOpen &&
+        createPortal(
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[10000] p-4">
+            <div className="relative">
+              <button
+                onClick={() => setIsChangePasswordOpen(false)}
+                className="absolute -top-3 -right-3 bg-white rounded-full shadow-md p-1.5 hover:bg-gray-50 z-10"
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+              <ChangePasswordForm
+                defaultUsername={user?.username || ""}
+                onSuccess={() => {
+                  // Close modal shortly after success message shows
+                  setTimeout(() => setIsChangePasswordOpen(false), 1200);
+                }}
+              />
             </div>
           </div>,
           document.body,
