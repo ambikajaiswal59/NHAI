@@ -69,7 +69,7 @@ const loadAllNamedPoints = async () => {
             throw new Error(`Failed to fetch named points GeoJSON: ${response.status}`);
         }
         const geojson = await response.json();
-        console.log("Named Points GeoJSON Loaded:", geojson);
+        // console.log("Named Points GeoJSON Loaded:", geojson);
 
         const points = [];
         (geojson.features || []).forEach((feature, index) => {

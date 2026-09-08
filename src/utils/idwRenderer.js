@@ -85,8 +85,8 @@ export async function renderIDWToCanvas(data, property, bounds, width, height) {
     }
 
     console.time('IDW Render');
-    console.log(`🎨 Starting IDW: ${width}x${height}, ${data.length} stations`);
-    console.log(`📊 Property: ${property}`);
+    // console.log(`🎨 Starting IDW: ${width}x${height}, ${data.length} stations`);
+    // console.log(`📊 Property: ${property}`);
 
     // First pass: calculate min/max for the selected property
     let minVal = Infinity;
@@ -107,7 +107,7 @@ export async function renderIDWToCanvas(data, property, bounds, width, height) {
     }
 
     const range = maxVal - minVal || 1;
-    console.log(`📊 Data Range: ${minVal.toFixed(2)} to ${maxVal.toFixed(2)} (${validDataCount} valid points)`);
+    // console.log(`📊 Data Range: ${minVal.toFixed(2)} to ${maxVal.toFixed(2)} (${validDataCount} valid points)`);
 
     // Second pass: create points with optimized weighting for monthly data
     const points = data
@@ -139,7 +139,7 @@ export async function renderIDWToCanvas(data, property, bounds, width, height) {
         throw new Error(`Not enough valid points: ${points.length} (need at least 3)`);
     }
 
-    console.log(`📍 Using ${points.length} points for interpolation`);
+    // console.log(`📍 Using ${points.length} points for interpolation`);
 
     // Get map bounds in projected coordinates
     const sw = L.CRS.EPSG3857.project(L.latLng(bounds.minLat, bounds.minLng));
@@ -150,7 +150,7 @@ export async function renderIDWToCanvas(data, property, bounds, width, height) {
     const minY = sw.y;
     const maxY = ne.y;
 
-    console.log(`📍 Map size: ${((maxX - minX) / 1000).toFixed(0)}km x ${((maxY - minY) / 1000).toFixed(0)}km`);
+    // console.log(`📍 Map size: ${((maxX - minX) / 1000).toFixed(0)}km x ${((maxY - minY) / 1000).toFixed(0)}km`);
 
     // Create canvas
     const canvas = document.createElement('canvas');
@@ -201,8 +201,8 @@ export async function renderIDWToCanvas(data, property, bounds, width, height) {
 
     ctx.putImageData(imageData, 0, 0);
 
-    console.log(`✅ Rendered ${pixelsRendered} pixels`);
-    console.timeEnd('IDW Render');
+    // console.log(`✅ Rendered ${pixelsRendered} pixels`);
+    // console.timeEnd('IDW Render');
     return canvas;
 }
 

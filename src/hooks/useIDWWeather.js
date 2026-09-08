@@ -82,7 +82,7 @@ export function useIDWWeather() {
 
         renderTimeoutRef.current = setTimeout(() => {
             setIsRendering(false);
-            console.log('IDW rendering complete, ready for next month');
+            // console.log('IDW rendering complete, ready for next month');
 
             if (pendingMonthRef.current) {
                 const pending = pendingMonthRef.current;
@@ -124,7 +124,6 @@ export function useIDWWeather() {
         }
     }, []);
 
-    // ✅ FIXED: Change the active layer with proper data handling
     const changeLayer = useCallback((layer) => {
         if (['rainfall', 'wind', 'temperature'].includes(layer)) {
             setSelectedLayer(layer);
@@ -135,14 +134,13 @@ export function useIDWWeather() {
                 renderTimeoutRef.current = null;
             }
 
-            // ✅ If weatherData is null or empty, populate it from allMonthlyData
             if (selectedMonth && allMonthlyData) {
                 const monthData = allMonthlyData.filter(item =>
                     `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonth
                 );
                 setWeatherData(monthData);
             } else if (allMonthlyData && months.length > 0) {
-                // ✅ If selectedMonth is null, use first month
+
                 const firstMonth = months[0];
                 setSelectedMonth(firstMonth);
                 const monthData = allMonthlyData.filter(item =>
@@ -158,7 +156,7 @@ export function useIDWWeather() {
 
             renderTimeoutRef.current = setTimeout(() => {
                 setIsRendering(false);
-                console.log(`Layer switch complete (${layer}), playback resuming`);
+
 
                 if (pendingMonthRef.current) {
                     const pending = pendingMonthRef.current;
@@ -181,7 +179,7 @@ export function useIDWWeather() {
                 if (!isRendering) {
                     nextMonth();
                 } else {
-                    console.log('⏳ Skipping interval - IDW is rendering');
+                
                 }
             }, playbackSpeed);
         }
