@@ -6,7 +6,6 @@ const NAMES_GEOJSON_PATH = '/data/FlyOver_Name.geojson';
 const UTM43N = '+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs';
 const WGS84 = 'EPSG:4326';
 
-// Map Type to highway names - ALL set to NH 152
 const highwayMap = {
     'F1': 'NH 152',
     'F2': 'NH 152',
@@ -14,7 +13,6 @@ const highwayMap = {
     'F4': 'NH 152'
 };
 
-// Map Type to risk status
 const riskStatusMap = {
     'F1': 'low',
     'F2': 'moderate',
@@ -52,43 +50,49 @@ const findProp = (props, keys) => {
     return null;
 };
 
-const loadNamedPointsByHighway = async () => {
+// Rough planar distance is fine at this regional scale (few km),
+// no need for haversine here.
+const dist2 = (aLat, aLng, bLat, bLng) => {
+    const dLat = aLat - bLat;
+    const dLng = aLng - bLng;
+    return dLat * dLat + dLng * dLng;
+};
+
+// Load ALL named points (flat list), independent of any highway grouping.
+// We no longer try to bucket by "Remarks -> highway" and then split again
+// by parsing digits out of NAME — that's what was silently dropping points
+// like "ROB-0+930" / "ROB-5+362".
+const loadAllNamedPoints = async () => {
     try {
         const response = await fetch(NAMES_GEOJSON_PATH);
         if (!response.ok) {
             throw new Error(`Failed to fetch named points GeoJSON: ${response.status}`);
         }
         const geojson = await response.json();
+        // console.log("Named Points GeoJSON Loaded:", geojson);
 
-        const byHighway = {};
+        const points = [];
         (geojson.features || []).forEach((feature, index) => {
             const props = feature.properties || {};
-            const remarks = findProp(props, ['Remarks', 'remarks']);
-            const highwayKey = normalizeHighway(remarks);
-            if (!highwayKey) return;
-
             const [lng, lat] = feature.geometry?.coordinates || [];
             if (typeof lat !== 'number' || typeof lng !== 'number') return;
 
-            const point = {
+            points.push({
                 id: findProp(props, ['id', 'ID']) ?? `point-${index + 1}`,
                 name: findProp(props, ['NAME', 'name']) || `Flyover ${index + 1}`,
                 chainage: findProp(props, ['Chainage', 'chainage']),
                 description: findProp(props, ['Descriptio', 'Description', 'description']),
                 length: findProp(props, ['Length', 'length']),
                 detail: findProp(props, ['Detail', 'detail', 'Details']),
-                remarks,
+                remarks: findProp(props, ['Remarks', 'remarks']),
                 latlng: [lat, lng],
-            };
-
-            if (!byHighway[highwayKey]) byHighway[highwayKey] = [];
-            byHighway[highwayKey].push(point);
+            });
         });
 
-        return byHighway;
+        return points;
     } catch (error) {
         console.error('Error loading named points GeoJSON:', error);
-        return {};
+        return [];
     }
 };
 
@@ -101,8 +105,7 @@ export const loadFlyoverData = async () => {
         const geojson = await response.json();
 
         const convertedFeatures = geojson.features.map(convertFeature);
-
-        const namedPointsByHighway = await loadNamedPointsByHighway();
+        const allNamedPoints = await loadAllNamedPoints();
 
         const grouped = {};
         convertedFeatures.forEach(feature => {
@@ -113,13 +116,10 @@ export const loadFlyoverData = async () => {
             grouped[type].push(feature);
         });
 
-        const flyovers = Object.keys(grouped).map((type, index) => {
+        // First pass: build flyover segments (no named points yet)
+        const flyoverShells = Object.keys(grouped).map((type, index) => {
             const features = grouped[type];
-
-            const featureCollection = {
-                type: 'FeatureCollection',
-                features
-            };
+            const featureCollection = { type: 'FeatureCollection', features };
 
             const allCoordinates = [];
             features.forEach(feature => {
@@ -131,9 +131,7 @@ export const loadFlyoverData = async () => {
                 }
             });
 
-            if (allCoordinates.length === 0) {
-                return null;
-            }
+            if (allCoordinates.length === 0) return null;
 
             let latSum = 0, lngSum = 0;
             allCoordinates.forEach(([lng, lat]) => {
@@ -149,37 +147,6 @@ export const loadFlyoverData = async () => {
 
             const highway = highwayMap[type] || `Highway ${type}`;
 
-            // Get all points for this highway
-            const allPoints = namedPointsByHighway[normalizeHighway(highway)] || [];
-
-            // ✅ FIX: Filter points that belong to THIS SPECIFIC flyover
-            // Extract the number from the type (e.g., "F1" -> "1", "F2" -> "2")
-            const typeNumberMatch = type.match(/\d+/);
-            const typeNumber = typeNumberMatch ? typeNumberMatch[0] : null;
-
-            let flyoverPoints = [];
-
-            if (typeNumber) {
-                // Filter points that match this flyover's number
-                // e.g., "FLYOVER 2" should match type "F2"
-                flyoverPoints = allPoints.filter(point => {
-                    const pointNumberMatch = point.name.match(/\d+/);
-                    const pointNumber = pointNumberMatch ? pointNumberMatch[0] : null;
-                    return pointNumber === typeNumber;
-                });
-            } else {
-                // Fallback: If no number in type, use all points (should not happen)
-                flyoverPoints = allPoints;
-            }
-
-            // Sort by Chainage
-            flyoverPoints.sort((a, b) => {
-                if (a.chainage && b.chainage) {
-                    return a.chainage.localeCompare(b.chainage);
-                }
-                return a.id - b.id;
-            });
-
             return {
                 id: index + 1,
                 highway,
@@ -188,27 +155,52 @@ export const loadFlyoverData = async () => {
                 path,
                 geojson: featureCollection,
                 type,
-                namedPoints: flyoverPoints,  //  POINTS top up data is ATTACHED HERE
+                namedPoints: [], // filled in below
             };
         }).filter(f => f !== null);
 
-        // Debug: Log what each flyover got
-        // console.log('=== Flyover Data Loaded ===');
-        // flyovers.forEach(f => {
-        //     console.log(`${f.type} (${f.highway}): ${f.namedPoints.length} named points`);
-        //     f.namedPoints.forEach(p => {
-        //         console.log(`  - ${p.name} (${p.chainage})`);
-        //     });
-        // });
+        // Second pass: assign each named point to its geographically
+        // nearest flyover segment (checked against every path vertex,
+        // not just the center, so long segments still get the right points).
+        allNamedPoints.forEach(point => {
+            const [pLat, pLng] = point.latlng;
+            let best = null;
+            let bestDist = Infinity;
 
-        return flyovers;
+            flyoverShells.forEach(flyover => {
+                const candidates = flyover.path.length > 0 ? flyover.path : [flyover.center];
+                candidates.forEach(([lat, lng]) => {
+                    const d = dist2(pLat, pLng, lat, lng);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        best = flyover;
+                    }
+                });
+            });
+
+            if (best) {
+                best.namedPoints.push(point);
+            }
+        });
+
+        // Sort each flyover's points by chainage
+        flyoverShells.forEach(flyover => {
+            flyover.namedPoints.sort((a, b) => {
+                if (a.chainage && b.chainage) {
+                    return a.chainage.localeCompare(b.chainage);
+                }
+                return (a.id ?? 0) - (b.id ?? 0);
+            });
+        });
+
+        return flyoverShells;
     } catch (error) {
         console.error('Error loading GeoJSON:', error);
         return null;
     }
 };
 
-export const getStatsFromFlyovers = (flyovers) => {
+export const getStatsFromFlyovers = (flyovers) => { 
     const total = flyovers.length;
     const low = flyovers.filter(f => f.riskStatus === 'low').length;
     const moderate = flyovers.filter(f => f.riskStatus === 'moderate').length;

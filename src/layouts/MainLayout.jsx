@@ -1,9 +1,10 @@
+// src/layouts/MainLayout.jsx
 import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import { Menu, X } from "lucide-react";
 
-export default function MainLayout({ children, activeNav, onNavChange, onLogout }) {
+export default function MainLayout({ children, activeNav, onNavChange, onLogout, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
@@ -27,10 +28,10 @@ export default function MainLayout({ children, activeNav, onNavChange, onLogout 
     >
       <div className="flex-shrink-0 z-[9998]">
         <div className="hidden min-[901px]:block">
-          <Header onLogout={onLogout} />
+          <Header onLogout={onLogout} user={user} />
         </div>
         <div className="max-[900px]:block hidden">
-          <Header only="logo" onLogout={onLogout} />
+          <Header only="logo" onLogout={onLogout} user={user} />
         </div>
       </div>
 
@@ -74,7 +75,7 @@ export default function MainLayout({ children, activeNav, onNavChange, onLogout 
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-3 sm:p-2 lg:p-3 flex flex-col min-h-0">
             <div className="max-[900px]:block hidden -m-3 sm:-m-2 mb-3">
-              <Header only="content" onLogout={onLogout} />
+              <Header only="content" onLogout={onLogout} user={user} />
             </div>
             <div className="flex-1 min-h-0 flex flex-col">{children}</div>
           </div>

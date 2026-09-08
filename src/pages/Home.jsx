@@ -26,7 +26,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="w-full flex flex-col gap-4 px-4">
+    <div className="w-full flex flex-col gap-4 ">
       <AlertMarquee alerts={alerts} />
 
       {/* min-h-[560px] is a hard floor — guarantees this row is never

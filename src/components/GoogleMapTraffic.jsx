@@ -534,7 +534,7 @@ export default function GoogleMapComponent() {
   // SIMPLE FIX: Load flyovers after a small delay when map is ready
   useEffect(() => {
     if (isMapReady && storedGeojson && !flyoverDataLoaded && activeLayers.includes('flyover') && isInitialLoad) {
-      console.log("Loading flyover layer...");
+      // console.log("Loading flyover layer...");
       // Small delay to ensure map tiles are loading
       const timer = setTimeout(() => {
         clearMarkers();

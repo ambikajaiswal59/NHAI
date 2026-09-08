@@ -99,6 +99,20 @@ export function getPointDetailFields(point) {
 // UNIFIED CANVAS ICON GENERATOR - Works for BOTH Leaflet & Google Maps
 // ============================================================
 
+// --- Pin geometry constants -----------------------------------------
+// These control how the circular pin is drawn on the canvas.
+// TOP_PADDING is the distance from the top edge of the canvas to the
+// CENTER of the pin circle. It must be large enough that the circle's
+// radius + its white border + its drop shadow all fit inside the
+// canvas without being clipped by the top edge — that clipping is what
+// was making the icons look "cut off" instead of a full circular ring.
+const PIN_RADIUS = 14;
+const PIN_BORDER_WIDTH = 3;
+const PIN_SHADOW_BLUR = 6;
+const PIN_SHADOW_OFFSET_Y = 2;
+const TOP_PADDING = PIN_RADIUS + PIN_BORDER_WIDTH / 2 + PIN_SHADOW_BLUR + PIN_SHADOW_OFFSET_Y + 4; // ~29, rounded below
+const LABEL_GAP = 6; // gap between the bottom of the pin ring and the label box
+
 /**
  * Helper: Draw rounded rectangle on canvas
  */
@@ -118,20 +132,23 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 /**
- * Draw the pin icon on canvas
+ * Draw the pin icon on canvas — a full circular ring (colored fill +
+ * white border) with a small white dot in the center. Uses PIN_RADIUS /
+ * PIN_BORDER_WIDTH / PIN_SHADOW_BLUR so the whole ring always has room
+ * to render without being clipped by the canvas edge.
  */
 function drawPin(ctx, color, pinX, pinY) {
-  const pinRadius = 14;
+  const radius = PIN_RADIUS;
 
-  // Pin shadow
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
-  ctx.shadowBlur = 6;
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = PIN_SHADOW_BLUR;
   ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowOffsetY = PIN_SHADOW_OFFSET_Y;
 
-  // Pin circle
+  // Main circle
   ctx.beginPath();
-  ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
+  ctx.arc(pinX, pinY, radius, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
@@ -141,42 +158,24 @@ function drawPin(ctx, color, pinX, pinY) {
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
 
-  // Pin border
+  // White border (the "ring") — full stroke, no clipping
   ctx.beginPath();
-  ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
+  ctx.arc(pinX, pinY, radius, 0, Math.PI * 2);
   ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = PIN_BORDER_WIDTH;
   ctx.stroke();
 
-  // Pin icon (simplified pin shape)
-  ctx.fillStyle = 'white';
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-
-  // Draw pin icon
+  // Inner white dot (gives it a modern look)
   ctx.beginPath();
-  ctx.moveTo(pinX, pinY - 5);
-  ctx.quadraticCurveTo(pinX + 5, pinY - 1, pinX + 5, pinY + 3);
-  ctx.quadraticCurveTo(pinX + 5, pinY + 5, pinX, pinY + 7);
-  ctx.quadraticCurveTo(pinX - 5, pinY + 5, pinX - 5, pinY + 3);
-  ctx.quadraticCurveTo(pinX - 5, pinY - 1, pinX, pinY - 5);
+  ctx.arc(pinX, pinY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
   ctx.fill();
-  ctx.stroke();
-
-  // Inner circle
-  ctx.beginPath();
-  ctx.arc(pinX, pinY + 1, 3, 0, Math.PI * 2);
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-  ctx.stroke();
 }
 
 /**
  * Draw the label on canvas
  */
-function drawLabel(ctx, { color, labelText, detailed, name, detailFields = [] }, width, height) {
-  const labelStartY = 32;
-
+function drawLabel(ctx, { color, labelText, detailed, name, detailFields = [] }, width, height, labelStartY) {
   if (detailed) {
     const padding = 6;
     const labelX = padding;
@@ -289,6 +288,20 @@ function drawLabel(ctx, { color, labelText, detailed, name, detailFields = [] },
 }
 
 /**
+ * Compute the total canvas height needed for a given icon configuration,
+ * and the y-position where the label box should start. Centralized here
+ * so createUnifiedMarkerIcon, makeFlyoverIcon, and createGoogleMapsMarkerIcon
+ * always agree on the same layout.
+ */
+function getIconLayout({ detailed, detailFields = [] }) {
+  const labelStartY = TOP_PADDING + PIN_RADIUS + LABEL_GAP;
+  const height = detailed
+    ? labelStartY + 26 + detailFields.length * 14
+    : labelStartY + 18 + 8;
+  return { labelStartY, height };
+}
+
+/**
  * UNIFIED ICON GENERATOR - Creates canvas-based icon for BOTH Leaflet and Google Maps
  * This is the ONLY function you should use for creating icons
  */
@@ -300,7 +313,7 @@ export function createUnifiedMarkerIcon({
   detailFields = []
 }) {
   const width = detailed ? 240 : 120;
-  const height = detailed ? 58 + detailFields.length * 14 : 58;
+  const { labelStartY, height } = getIconLayout({ detailed, detailFields });
 
   // Create canvas with 2x resolution for retina
   const canvas = document.createElement('canvas');
@@ -312,13 +325,14 @@ export function createUnifiedMarkerIcon({
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
 
-  // Draw pin
+  // Draw pin — centered horizontally, with enough top padding that the
+  // ring (fill + white border + shadow) is never clipped by the canvas edge
   const pinX = width / 2;
-  const pinY = 14;
+  const pinY = TOP_PADDING;
   drawPin(ctx, color, pinX, pinY);
 
   // Draw label
-  drawLabel(ctx, { color, labelText, detailed, name, detailFields }, width, height);
+  drawLabel(ctx, { color, labelText, detailed, name, detailFields }, width, height, labelStartY);
 
   // Return the canvas data URL
   return canvas.toDataURL('image/png');
@@ -330,11 +344,7 @@ export function createUnifiedMarkerIcon({
 
 export function makeFlyoverIcon({ color, labelText, detailed, name, detailFields = [] }) {
   const width = detailed ? 240 : 120;
-  const height = detailed ? 58 + detailFields.length * 14 : 58;
-
-
-
-
+  const { height } = getIconLayout({ detailed, detailFields });
 
   // Generate the canvas image
   const imageDataUrl = createUnifiedMarkerIcon({
@@ -352,13 +362,16 @@ export function makeFlyoverIcon({ color, labelText, detailed, name, detailFields
   img.style.height = height + 'px';
   img.style.display = 'block';
 
-  // Return as Leaflet divIcon with the image
+  // Return as Leaflet divIcon with the image.
+  // iconAnchor is the CENTER of the pin circle (TOP_PADDING from the top),
+  // so the ring's true center — not an arbitrary point — lines up with the
+  // marker's geographic coordinate.
   return L.divIcon({
     className: 'flyover-marker-icon unified-marker',
     html: img.outerHTML,
     iconSize: [width, height],
-    iconAnchor: [width / 2, 26],
-    popupAnchor: [0, -30],
+    iconAnchor: [width / 2, TOP_PADDING],
+    popupAnchor: [0, -(TOP_PADDING + PIN_RADIUS)],
   });
 }
 
@@ -374,7 +387,7 @@ export function createGoogleMapsMarkerIcon({
   detailFields = []
 }) {
   const width = detailed ? 240 : 120;
-  const height = detailed ? 58 + detailFields.length * 14 : 58;
+  const { height } = getIconLayout({ detailed, detailFields });
 
   // Generate the canvas image (same as Leaflet)
   const imageDataUrl = createUnifiedMarkerIcon({
@@ -388,7 +401,7 @@ export function createGoogleMapsMarkerIcon({
   return {
     url: imageDataUrl,
     scaledSize: new google.maps.Size(width, height),
-    anchor: new google.maps.Point(width / 2, 26),
+    anchor: new google.maps.Point(width / 2, TOP_PADDING),
   };
 }
 
@@ -480,3 +493,27 @@ function getGeoJsonBounds(geojson) {
   ];
 }
 
+export function FitToVisibleFlyovers({ data }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !data || !data.features || data.features.length === 0) return;
+
+    try {
+      const layer = L.geoJSON(data);
+      const bounds = layer.getBounds();
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [60, 60],
+          maxZoom: 15, // avoid over-zooming when only 1 point/segment is visible
+          animate: true,
+        });
+      }
+    } catch (e) {
+      console.warn("FitToVisibleFlyovers: failed to fit bounds", e);
+    }
+  }, [data, map]);
+
+  return null;
+}
