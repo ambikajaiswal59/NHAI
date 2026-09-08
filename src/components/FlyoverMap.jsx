@@ -18,6 +18,8 @@ import "leaflet/dist/leaflet.css";
 import {
   Maximize2,
   Minimize2,
+  Maximize,
+  Minimize,
   CloudRain,
   Cloud,
   Sun,
@@ -181,9 +183,9 @@ function FullscreenControl({ containerRef }) {
       if (!root) return;
       root.render(
         fullscreen ? (
-          <Minimize2 size={15} className="text-gray-700" />
+          <Minimize size={16} className="text-gray-700" />
         ) : (
-          <Maximize2 size={15} className="text-gray-700" />
+          <Maximize size={16} className="text-gray-700" />
         ),
       );
     };
@@ -230,7 +232,6 @@ function FullscreenControl({ containerRef }) {
 
   return null;
 }
-
 
 function BaseMapPanel({ open, setOpen, baseMap, onChange }) {
   if (!open) {
@@ -344,7 +345,6 @@ const locationIcon = L.divIcon({
   iconAnchor: [15, 34],
   popupAnchor: [0, -30],
 });
-
 
 const CONDITIONS = {
   clear: { icon: Sun, accent: "#fdba55", glow: "rgba(253,186,85,0.35)" },
@@ -539,7 +539,6 @@ export default function FlyoverMap({
   const [isDetailZoom, setIsDetailZoom] = useState(false);
   const [baseMap, setBaseMap] = useState("satellite");
   const riskColorMap = { low: "#22c55e", moderate: "#f97316", high: "#ef4444" };
-
 
   useEffect(() => {
     const handleChange = () => {
