@@ -1,4 +1,3 @@
-// components/FlyoverMap.jsx
 import { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
@@ -31,8 +30,35 @@ import {
   Eye,
   Loader2,
   MapPin,
+  Layers,
+  X,
 } from "lucide-react";
 import { createRoot } from "react-dom/client";
+
+// ---- base map sources -------------------------------------------------
+const BASE_MAPS = {
+  streets: {
+    url: "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    maxZoom: 25,
+    attribution: "",
+  },
+
+  satellite: {
+    url: "https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    maxZoom: 25,
+    attribution: "",
+  },
+
+  esriSatellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    subdomains: [], // IMPORTANT
+    maxNativeZoom: 19,
+    maxZoom: 25,
+    attribution: "",
+  },
+};
 
 function ResizeHandler() {
   const map = useMap();
@@ -205,8 +231,97 @@ function FullscreenControl({ containerRef }) {
   return null;
 }
 
-// Classic map-pin (location marker) — teardrop outline with a hollow
-// center circle, matching lucide's MapPin glyph, in brand gradient.
+
+function BaseMapPanel({ open, setOpen, baseMap, onChange }) {
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex h-[30px] w-[30px] items-center justify-center bg-white rounded-md shadow"
+        title="Base map"
+      >
+        <Layers size={16} className="text-blue-600" />
+      </button>
+    );
+  }
+  return (
+    <div className="w-44 rounded-lg bg-white shadow-lg p-3 text-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold text-gray-800">Layers</span>
+        <button
+          onClick={() => setOpen(false)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+        Base map
+      </p>
+      <div className="space-y-1.5">
+        {[
+          { key: "streets", label: "Streets" },
+          { key: "satellite", label: "Google Satellite" },
+          { key: "esriSatellite", label: "Esri Satellite" },
+        ].map((opt) => (
+          <label
+            key={opt.key}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <input
+              type="radio"
+              name="basemap"
+              checked={baseMap === opt.key}
+              onChange={() => onChange(opt.key)}
+              className="accent-blue-600"
+            />
+            <span className="text-gray-700">{opt.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BaseMapControl({ baseMap, onChange }) {
+  const map = useMap();
+  const rootRef = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const Control = L.Control.extend({
+      onAdd: () => {
+        const el = L.DomUtil.create(
+          "div",
+          "leaflet-bar leaflet-control basemap-control",
+        );
+        L.DomEvent.disableClickPropagation(el);
+        L.DomEvent.disableScrollPropagation(el);
+        rootRef.current = createRoot(el);
+        return el;
+      },
+    });
+    const control = new Control({ position: "topleft" });
+    control.addTo(map);
+    return () => {
+      rootRef.current?.unmount();
+      control.remove();
+    };
+  }, [map]);
+
+  useEffect(() => {
+    rootRef.current?.render(
+      <BaseMapPanel
+        open={open}
+        setOpen={setOpen}
+        baseMap={baseMap}
+        onChange={onChange}
+      />,
+    );
+  }, [open, baseMap, onChange]);
+
+  return null;
+}
 const locationIcon = L.divIcon({
   className: "flyover-location-marker",
   html: `
@@ -230,12 +345,7 @@ const locationIcon = L.divIcon({
   popupAnchor: [0, -30],
 });
 
-// ---- condition -> visual language -----------------------------------
-// The card itself is a single neutral dark-glass surface (see
-// CARD_BACKGROUND below) so it holds up against any map terrain —
-// green farmland, gray city blocks, blue coastline, dark satellite.
-// Only the icon badge and its glow carry the condition's color, so the
-// weather is still legible at a glance without recoloring the whole card.
+
 const CONDITIONS = {
   clear: { icon: Sun, accent: "#fdba55", glow: "rgba(253,186,85,0.35)" },
   "partly cloudy": {
@@ -275,11 +385,6 @@ function resolveCondition(conditionCode) {
   return CONDITIONS["partly cloudy"];
 }
 
-// Compact weather card rendered inside the Leaflet popup. Handles its own
-// loading state so the popup can open the instant the marker is placed,
-// before the weather API response has come back. Same name/props as
-// before (`weather`, `loading`) so nothing else in this file needs to
-// change — only the internals are redesigned.
 function WeatherPopupCard({ weather, loading }) {
   if (loading || !weather) {
     return (
@@ -432,11 +537,10 @@ export default function FlyoverMap({
   const markerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDetailZoom, setIsDetailZoom] = useState(false);
+  const [baseMap, setBaseMap] = useState("satellite");
   const riskColorMap = { low: "#22c55e", moderate: "#f97316", high: "#ef4444" };
 
-  // Compare against this card's own container — with multiple map cards on
-  // the page, a global fullscreenchange event fires for whichever one went
-  // fullscreen, so each card must check it's actually the one in question.
+
   useEffect(() => {
     const handleChange = () => {
       setIsFullscreen(document.fullscreenElement === containerRef.current);
@@ -465,13 +569,6 @@ export default function FlyoverMap({
     (point) => Array.isArray(point.latlng) && point.latlng.length === 2,
   );
 
-  // Must live *inside* MapContainer to use useMap(). Invalidates the map's
-  // cached size before opening the popup — right after a fullscreen
-  // transition Leaflet's internal size can be stale, which throws off the
-  // popup's pixel position and makes it render off-screen (looks like no
-  // popup shows up at all). Only opens the popup when this card is the one
-  // currently in fullscreen — in the normal grid view, a click should just
-  // update the side WeatherPanel, not pop anything up on the map.
   function PopupOpener({ markerRef, markerPosition, isFullscreen }) {
     const map = useMap();
     useEffect(() => {
@@ -566,6 +663,8 @@ export default function FlyoverMap({
       <MapContainer
         center={validCenter}
         zoom={15}
+        minZoom={9}
+        maxZoom={20}
         scrollWheelZoom={true}
         dragging={true}
         doubleClickZoom={true}
@@ -585,6 +684,7 @@ export default function FlyoverMap({
         <FullscreenFit geojson={geojson} isFullscreen={isFullscreen} />
         <MapClickHandler onMapClick={handleClick} />
         <FullscreenControl containerRef={containerRef} />
+        <BaseMapControl baseMap={baseMap} onChange={setBaseMap} />
         <PopupOpener
           markerRef={markerRef}
           markerPosition={markerPosition}
@@ -592,8 +692,12 @@ export default function FlyoverMap({
         />
 
         <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          attribution='&copy; <a href="https://www.esri.com">Esri</a>'
+          key={baseMap}
+          url={BASE_MAPS[baseMap].url}
+          subdomains={BASE_MAPS[baseMap].subdomains}
+          maxNativeZoom={BASE_MAPS[baseMap].maxNativeZoom}
+          maxZoom={BASE_MAPS[baseMap].maxZoom}
+          attribution={BASE_MAPS[baseMap].attribution}
         />
         <MarkerZoomVisibility onDetailZoomChange={setIsDetailZoom} />
         <FlyoverGeoJsonLayer
