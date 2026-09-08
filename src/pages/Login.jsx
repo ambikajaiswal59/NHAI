@@ -70,17 +70,141 @@ export default function Login({ onLoginSuccess }) {
       <div className="relative z-10 w-full max-w-sm">
         {/* Login Card */}
         <div className="bg-white/95 backdrop-blur-md rounded-xl border border-white/30 shadow-2xl px-8 py-9">
-          {/* NHAI LOGO */}
+          {/* NHAI 3D LOGO */}
+          {/* NHAI 3D LOGO */}
           <div className="flex justify-center mb-6">
-            <div className="h-16 w-16 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
-              <img
-                src={NHAILOGO}
-                alt="NHAI Logo"
-                className="h-12 w-12 object-contain"
+            <div className="relative group">
+              {/* Outer glow */}
+              <div className="absolute -inset-4 rounded-full bg-cyan-400/20 blur-2xl opacity-70" />
+
+              {/* ROTATING OUTER RING */}
+              <div className="absolute -inset-[4px] rounded-full animate-[spin_8s_linear_infinite]">
+                <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cyan-300 border-r-blue-500 border-b-cyan-500" />
+
+                {/* Rotating highlight */}
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_14px_#00f0ff]" />
+              </div>
+
+              {/* SECOND ROTATING RING - opposite direction */}
+              <div className="absolute -inset-[8px] rounded-full animate-[spin_14s_linear_infinite_reverse]">
+                <div className="absolute inset-0 rounded-full border border-cyan-400/30 border-l-transparent border-b-transparent" />
+              </div>
+
+              {/* Main 3D circular body */}
+              <div
+                className="relative h-24 w-24 rounded-full p-[3px]
+      bg-gradient-to-br from-cyan-300 via-blue-600 to-cyan-800
+      shadow-[0_0_30px_rgba(0,240,255,0.4)]"
+              >
+                {/* Dark inner surface */}
+                <div
+                  className="relative h-full w-full rounded-full
+        bg-gradient-to-br from-[#102a4c] via-[#0b1935] to-[#06101f]
+        flex items-center justify-center overflow-hidden"
+                >
+                  {/* Static inner technical rings */}
+                  <div className="absolute inset-[5px] rounded-full border border-cyan-300/30" />
+                  <div className="absolute inset-[9px] rounded-full border border-cyan-400/10" />
+
+                  {/* Glass reflection */}
+                  <div
+                    className="absolute -top-8 left-3 w-16 h-12
+          bg-white/20 rounded-full blur-xl rotate-[-25deg]"
+                  />
+
+                  {/* NHAI logo - stays completely still */}
+                  <div
+                    className="relative h-16 w-16 rounded-full
+          bg-white flex items-center justify-center
+          shadow-[0_0_20px_rgba(0,240,255,0.35)]
+          border border-cyan-100/60"
+                  >
+                    <img
+                      src={NHAILOGO}
+                      alt="NHAI Logo"
+                      className="h-12 w-12 object-contain
+              drop-shadow-[0_3px_4px_rgba(0,0,0,0.25)]"
+                    />
+                  </div>
+
+                  {/* Bottom cyan reflection */}
+                  <div
+                    className="absolute bottom-0 left-1/2
+          -translate-x-1/2 w-14 h-3
+          bg-cyan-400/30 blur-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Orbiting dots */}
+              <span
+                className="absolute top-0 right-0 h-2 w-2 rounded-full
+        bg-cyan-300 shadow-[0_0_12px_#00f0ff]
+        animate-pulse"
+              />
+
+              <span
+                className="absolute bottom-1 left-0 h-1.5 w-1.5 rounded-full
+        bg-blue-400 shadow-[0_0_8px_#008cff]
+        animate-pulse"
+                style={{ animationDelay: "700ms" }}
               />
             </div>
           </div>
+          {/* Project Title */}
+          {/* Project Title & Tagline */}
+          <div className="text-center mb-6 px-1 w-full">
+            <h1
+              className="
+      text-[14px]
+      sm:text-[15px]
+      leading-[1.2]
+      font-bold
+      tracking-[-0.02em]
+      text-slate-900
+      whitespace-normal
+      sm:whitespace-nowrap
+    "
+            >
+              AI Risk Intelligence & Remote Monitoring System
+            </h1>
 
+            <div
+              className="
+      mt-2
+      flex
+      flex-wrap
+      items-center
+      justify-center
+      gap-x-1.5
+      sm:gap-x-2
+      gap-y-1
+      px-1
+      text-[8px]
+      sm:text-[9px]
+      font-medium
+      leading-tight
+    "
+            >
+              <span className="text-slate-400">•</span>
+
+              <span className="text-blue-600 whitespace-nowrap">
+                Smart Monitoring
+              </span>
+
+              <span className="text-slate-400">•</span>
+
+              <span className="text-green-600 whitespace-nowrap">
+                Predictive Insights
+              </span>
+
+              <span className="text-slate-400">•</span>
+
+              <span className="text-orange-600 whitespace-nowrap">
+                Safer Highways
+              </span>
+            </div>
+          </div>
           {/* =================================================
               LOGIN FORM
           ================================================== */}
