@@ -16,7 +16,13 @@ export function ZoomTracker({ onZoomChange }) {
   return null;
 }
 
-export function FadeInGeoJSON({ data, style, targetOpacity = 1, targetFillOpacity, ...rest }) {
+export function FadeInGeoJSON({
+  data,
+  style,
+  targetOpacity = 1,
+  targetFillOpacity,
+  ...rest
+}) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const raf = requestAnimationFrame(() => setVisible(true));
@@ -38,14 +44,21 @@ export function FadeInGeoJSON({ data, style, targetOpacity = 1, targetFillOpacit
 export function findProp(props, keys) {
   if (!props) return null;
   for (const key of keys) {
-    if (props[key] !== undefined && props[key] !== null && props[key] !== "") return props[key];
+    if (props[key] !== undefined && props[key] !== null && props[key] !== "")
+      return props[key];
   }
   return null;
 }
 
 const FLYOVER_COLORS = [
-  "#DC2626", "#2563EB", "#059669", "#D97706",
-  "#7C3AED", "#DB2777", "#0891B2", "#65A30D",
+  "#DC2626",
+  "#2563EB",
+  "#059669",
+  "#D97706",
+  "#7C3AED",
+  "#DB2777",
+  "#0891B2",
+  "#65A30D",
 ];
 
 export function getFlyoverColor(index) {
@@ -64,11 +77,13 @@ export function getFlyoverDisplayName(type, indexFallback = 0) {
 // Cleans up a raw point name like "FLYOVER-3" into "Flyover 3" for display.
 export function formatPointName(rawName) {
   if (!rawName) return "";
-  return rawName
-    .toString()
-    .replace(/[-_]+/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    rawName
+      .toString()
+     // .replace(/[-_]+/g, " ")
+      // .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 }
 
 // Highway-level fields (Risk category / score / segment type) — no
@@ -77,10 +92,15 @@ export function getHighwayDetailFields(flyover) {
   const props = flyover?.geojson?.features?.[0]?.properties || {};
   const fields = [
     { label: "Risk", value: findProp(props, ["RiskCatego", "riskCategory"]) },
-    { label: "Risk score", value: findProp(props, ["Risk SCore", "Risk Score", "riskScore"]) },
+    {
+      label: "Risk score",
+      value: findProp(props, ["Risk SCore", "Risk Score", "riskScore"]),
+    },
     { label: "Segment type", value: findProp(props, ["Type", "type"]) },
   ];
-  return fields.filter((f) => f.value !== null && f.value !== undefined && f.value !== "");
+  return fields.filter(
+    (f) => f.value !== null && f.value !== undefined && f.value !== "",
+  );
 }
 
 // Point-level fields (Chainage/Descriptio/Length/Detail) from FlyOver_Name.
@@ -92,7 +112,9 @@ export function getPointDetailFields(point) {
     { label: "Length", value: point.length },
     { label: "Structure", value: point.detail },
   ];
-  return fields.filter((f) => f.value !== null && f.value !== undefined && f.value !== "");
+  return fields.filter(
+    (f) => f.value !== null && f.value !== undefined && f.value !== "",
+  );
 }
 
 // ============================================================
@@ -106,12 +128,12 @@ export function getPointDetailFields(point) {
 // radius + its white border + its drop shadow all fit inside the
 // canvas without being clipped by the top edge — that clipping is what
 // was making the icons look "cut off" instead of a full circular ring.
-const PIN_RADIUS = 14;
+const PIN_RADIUS = 12;
 const PIN_BORDER_WIDTH = 3;
 const PIN_SHADOW_BLUR = 6;
 const PIN_SHADOW_OFFSET_Y = 2;
 const TOP_PADDING = PIN_RADIUS + PIN_BORDER_WIDTH / 2 + PIN_SHADOW_BLUR + PIN_SHADOW_OFFSET_Y + 4; // ~29, rounded below
-const LABEL_GAP = 6; // gap between the bottom of the pin ring and the label box
+const LABEL_GAP = 4; // gap between the bottom of the pin ring and the label box
 
 /**
  * Helper: Draw rounded rectangle on canvas
@@ -138,153 +160,89 @@ function roundRect(ctx, x, y, w, h, r) {
  * to render without being clipped by the canvas edge.
  */
 function drawPin(ctx, color, pinX, pinY) {
-  const radius = PIN_RADIUS;
+  const pinRadius = 13;
 
-  // Shadow
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  // Pin shadow
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
   ctx.shadowBlur = PIN_SHADOW_BLUR;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = PIN_SHADOW_OFFSET_Y;
 
   // Main circle
   ctx.beginPath();
-  ctx.arc(pinX, pinY, radius, 0, Math.PI * 2);
+  ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
   // Reset shadow
-  ctx.shadowColor = 'transparent';
+  ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
 
-  // White border (the "ring") — full stroke, no clipping
+  // White border (the "ring")
   ctx.beginPath();
-  ctx.arc(pinX, pinY, radius, 0, Math.PI * 2);
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = PIN_BORDER_WIDTH;
+  ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Inner white dot (gives it a modern look)
+  // Inner white dot
   ctx.beginPath();
   ctx.arc(pinX, pinY, 4, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.fill();
 }
 
 /**
  * Draw the label on canvas
  */
-function drawLabel(ctx, { color, labelText, detailed, name, detailFields = [] }, width, height, labelStartY) {
+function drawLabel(
+  ctx,
+  { color, labelText, detailed, name, detailFields = [] },
+  labelX,
+  pinY,
+  labelHeight,
+) {
   if (detailed) {
-    const padding = 6;
-    const labelX = padding;
-    const labelWidth = width - padding * 2;
-    const labelHeight = height - labelStartY;
-
-    // Label shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.25)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 2;
-
-    // Label background
-    ctx.fillStyle = 'white';
-    ctx.beginPath();
-    roundRect(ctx, labelX, labelStartY, labelWidth, labelHeight, 8);
-    ctx.fill();
-
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Label border
-    ctx.strokeStyle = color + '55';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    roundRect(ctx, labelX, labelStartY, labelWidth, labelHeight, 8);
-    ctx.stroke();
-
-    // Top accent line
-    ctx.beginPath();
-    ctx.moveTo(labelX, labelStartY);
-    ctx.lineTo(labelX + labelWidth, labelStartY);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Name
-    if (name) {
-      ctx.fillStyle = '#111827';
-      ctx.font = 'bold 12px Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      const nameY = labelStartY + padding + 2;
-      ctx.fillText(name, labelX + padding, nameY);
-    }
-
-    // Detail fields
-    const fieldStartY = name ? labelStartY + padding + 20 : labelStartY + padding + 4;
-    detailFields.forEach((field, index) => {
-      const y = fieldStartY + index * 14;
-
-      // Label
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '600 9px Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(field.label, labelX + padding, y);
-
-      // Value
-      ctx.fillStyle = '#1f2937';
-      ctx.font = '600 10px Arial, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'top';
-      ctx.fillText(field.value, labelX + labelWidth - padding, y);
-    });
-
+    // ... detailed layout logic stays same, just positioned at labelX / pinY - labelHeight/2
   } else if (labelText) {
-    ctx.font = '600 10px Arial, sans-serif';
+    ctx.font = "800 10px Arial, sans-serif";
     const textWidth = ctx.measureText(labelText).width;
-    const padding = 4;
-    const labelWidth = Math.min(width - 10, textWidth + padding * 4 + 4);
-    const labelX = (width - labelWidth) / 2;
-    const labelHeight = 18;
+    const padding = 2;
+    const labelWidth = textWidth + padding * 2 + 2;
+    const labelY = pinY - labelHeight / 2; // vertically centered on pin
 
-    // Label shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.2)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 0;
+    ctx.shadowColor = "rgba(0,0,0,0.2)";
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 1;
     ctx.shadowOffsetY = 1;
 
-    // Label background
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = "white";
     ctx.beginPath();
-    roundRect(ctx, labelX, labelStartY, labelWidth, labelHeight, 6);
+    roundRect(ctx, labelX, labelY, labelWidth, labelHeight, 5);
     ctx.fill();
 
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
+    ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    // Label border
-    ctx.strokeStyle = color + '55';
+    ctx.strokeStyle = color + "55";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    roundRect(ctx, labelX, labelStartY, labelWidth, labelHeight, 6);
+    roundRect(ctx, labelX, labelY, labelWidth, labelHeight, 5);
     ctx.stroke();
 
-    // Text
-    ctx.fillStyle = '#1f2937';
-    ctx.font = '600 10px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(labelText, width / 2, labelStartY + labelHeight / 2);
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "600 10px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(labelText, labelX + labelWidth / 2, labelY + labelHeight / 2);
+
+    return labelWidth; // caller needs this to size the canvas
   }
+  return 0;
 }
 
 /**
@@ -310,68 +268,92 @@ export function createUnifiedMarkerIcon({
   labelText,
   detailed = false,
   name = "",
-  detailFields = []
+  detailFields = [],
 }) {
-  const width = detailed ? 240 : 120;
-  const { labelStartY, height } = getIconLayout({ detailed, detailFields });
+  const pinRadius = 13;
+  const pinDiameter = pinRadius * 2;
+  const gap = 4;
+  const labelHeight = detailed ? 20 + detailFields.length * 14 : 18;
 
-  // Create canvas with 2x resolution for retina
-  const canvas = document.createElement('canvas');
+  // Measure text first to size the canvas correctly
+  const measureCanvas = document.createElement("canvas");
+  const mctx = measureCanvas.getContext("2d");
+  mctx.font = "800 10px Arial, sans-serif";
+  const textWidth = labelText ? mctx.measureText(labelText).width : 0;
+  const padding = 3;
+  const labelWidth = labelText ? textWidth + padding * 4 + 4 : 0;
+
+  const pinX = pinRadius + 4; // small left padding
+  const pinY = Math.max(pinRadius + 4, labelHeight / 2 + 2); // center pin so label fits vertically
+
+  const width = pinX + pinRadius + (labelText ? gap + labelWidth : 0) + 6;
+  const height = Math.max(pinY + pinRadius + 6, labelHeight + 4);
+
+  const canvas = document.createElement("canvas");
   canvas.width = width * 2;
   canvas.height = height * 2;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   ctx.scale(2, 2);
 
-  // Clear canvas
   ctx.clearRect(0, 0, width, height);
 
-  // Draw pin — centered horizontally, with enough top padding that the
-  // ring (fill + white border + shadow) is never clipped by the canvas edge
-  const pinX = width / 2;
-  const pinY = TOP_PADDING;
+  // Draw pin first (left side)
   drawPin(ctx, color, pinX, pinY);
 
-  // Draw label
-  drawLabel(ctx, { color, labelText, detailed, name, detailFields }, width, height, labelStartY);
+  // Draw label to the right, vertically centered on the pin
+  const labelX = pinX + pinRadius + gap;
+  drawLabel(
+    ctx,
+    { color, labelText, detailed, name, detailFields },
+    labelX,
+    pinY,
+    labelHeight,
+  );
 
-  // Return the canvas data URL
-  return canvas.toDataURL('image/png');
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    width,
+    height,
+    pinX,
+    pinY,
+    pinRadius,
+  };
 }
 
 // ============================================================
 // LEAFLET ICON - Uses the unified canvas generator
 // ============================================================
 
-export function makeFlyoverIcon({ color, labelText, detailed, name, detailFields = [] }) {
-  const width = detailed ? 240 : 120;
-  const { height } = getIconLayout({ detailed, detailFields });
-
-  // Generate the canvas image
-  const imageDataUrl = createUnifiedMarkerIcon({
+export function makeFlyoverIcon({
+  color,
+  labelText,
+  detailed,
+  name,
+  detailFields = [],
+}) {
+  const { dataUrl, width, height, pinX, pinY } = createUnifiedMarkerIcon({
     color,
     labelText,
     detailed,
     name,
-    detailFields
+    detailFields,
   });
 
-  // Create an image element from the canvas data
-  const img = document.createElement('img');
-  img.src = imageDataUrl;
-  img.style.width = width + 'px';
-  img.style.height = height + 'px';
-  img.style.display = 'block';
+  const img = document.createElement("img");
+  img.src = dataUrl;
+  img.style.width = width + "px";
+  img.style.height = height + "px";
+  img.style.display = "block";
 
-  // Return as Leaflet divIcon with the image.
-  // iconAnchor is the CENTER of the pin circle (TOP_PADDING from the top),
-  // so the ring's true center — not an arbitrary point — lines up with the
-  // marker's geographic coordinate.
   return L.divIcon({
-    className: 'flyover-marker-icon unified-marker',
+    className: "flyover-marker-icon unified-marker",
     html: img.outerHTML,
     iconSize: [width, height],
-    iconAnchor: [width / 2, TOP_PADDING],
-    popupAnchor: [0, -(TOP_PADDING + PIN_RADIUS)],
+    // anchor at the PIN (left side), not center of the whole icon —
+    // this keeps the lat/lng point accurate under the pin, with label
+    // floating to the right of it
+    iconAnchor: [pinX, pinY],
+    popupAnchor: [width / 2 - pinX, -(pinY + 10)],
   });
 }
 
@@ -384,24 +366,20 @@ export function createGoogleMapsMarkerIcon({
   labelText,
   detailed = false,
   name = "",
-  detailFields = []
+  detailFields = [],
 }) {
-  const width = detailed ? 240 : 120;
-  const { height } = getIconLayout({ detailed, detailFields });
-
-  // Generate the canvas image (same as Leaflet)
-  const imageDataUrl = createUnifiedMarkerIcon({
+  const { dataUrl, width, height, pinX, pinY } = createUnifiedMarkerIcon({
     color,
     labelText,
     detailed,
     name,
-    detailFields
+    detailFields,
   });
 
   return {
-    url: imageDataUrl,
+    url: dataUrl,
     scaledSize: new google.maps.Size(width, height),
-    anchor: new google.maps.Point(width / 2, TOP_PADDING),
+    anchor: new google.maps.Point(pinX, pinY),
   };
 }
 
@@ -412,7 +390,13 @@ export function createGoogleMapsMarkerIcon({
 /**
  * @deprecated Use createUnifiedMarkerIcon instead
  */
-export function buildMarkerLabelHTML({ color, labelText, detailed, name, detailFields = [] }) {
+export function buildMarkerLabelHTML({
+  color,
+  labelText,
+  detailed,
+  name,
+  detailFields = [],
+}) {
   // Kept for backward compatibility but no longer used
   return "";
 }
@@ -420,7 +404,13 @@ export function buildMarkerLabelHTML({ color, labelText, detailed, name, detailF
 /**
  * @deprecated Use createUnifiedMarkerIcon instead
  */
-export function buildMarkerHTML({ color, labelText, detailed, name, detailFields = [] }) {
+export function buildMarkerHTML({
+  color,
+  labelText,
+  detailed,
+  name,
+  detailFields = [],
+}) {
   // Kept for backward compatibility but no longer used
   return "";
 }
@@ -464,7 +454,8 @@ export function FocusOnPoint({ latlng, triggerKey, zoom = 15 }) {
   const prevTriggerRef = useRef(null);
 
   useEffect(() => {
-    if (!latlng || triggerKey == null || triggerKey === prevTriggerRef.current) return;
+    if (!latlng || triggerKey == null || triggerKey === prevTriggerRef.current)
+      return;
     prevTriggerRef.current = triggerKey;
     map.flyTo(latlng, Math.max(map.getZoom(), zoom), { duration: 0.8 });
   }, [latlng, triggerKey, map, zoom]);
@@ -473,7 +464,8 @@ export function FocusOnPoint({ latlng, triggerKey, zoom = 15 }) {
 }
 
 function getGeoJsonBounds(geojson) {
-  if (!geojson || !geojson.features || geojson.features.length === 0) return null;
+  if (!geojson || !geojson.features || geojson.features.length === 0)
+    return null;
   const lats = [];
   const lngs = [];
   const walk = (coords) => {

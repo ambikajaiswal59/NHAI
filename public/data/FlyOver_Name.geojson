@@ -15,7 +15,7 @@
         "Length": "171.5 Mtr",
         "Detail": "04 x 31.50 + 1 x 45.50 m",
         "Remarks": "NH 152",
-        "NAME": "ROB-0+930"
+        "NAME": "ROB (Chainage 0+930)"
       },
       "geometry": {
         "type": "Point",
@@ -64,7 +64,7 @@
         "Length": "56 Mtr",
         "Detail": "01 x 56 m",
         "Remarks": "NH 152",
-        "NAME": "ROB-5+362"
+        "NAME": "ROB (Chainage 5+362)"
       },
       "geometry": {
         "type": "Point",
