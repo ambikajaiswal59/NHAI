@@ -67,7 +67,7 @@ export function formatPointName(rawName) {
   return rawName
     .toString()
     .replace(/[-_]+/g, " ")
-    .toLowerCase()
+   // .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

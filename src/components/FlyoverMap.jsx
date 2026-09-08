@@ -586,7 +586,7 @@ export default function FlyoverMap({
         <MapClickHandler onMapClick={handleClick} />
         <FullscreenControl containerRef={containerRef} />
         <PopupOpener
-          markerRef={markerRef}
+         // markerRef={markerRef}
           markerPosition={markerPosition}
           isFullscreen={isFullscreen}
         />
