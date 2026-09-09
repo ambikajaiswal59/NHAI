@@ -135,28 +135,28 @@ export default function HomeMap() {
   const [idwLayer, setIdwLayer] = useState(null);
   const idwLayerRef = useRef(null);
   const [bufferBoundary, setBufferBoundary] = useState(null);
-  const preRenderStartedRef = useRef(false); 
+  const preRenderStartedRef = useRef(false);
   const mapWrapperRef = useRef(null);
   const mapRef = useRef(null);
 
-const flyoverMarkers = useMemo(() => {
-  const markers = flyoversList.map((flyover, index) => {
-    const color = getFlyoverColor(index);
+  const flyoverMarkers = useMemo(() => {
+    const markers = flyoversList.map((flyover, index) => {
+      const color = getFlyoverColor(index);
 
-    const firstPoint = flyover.namedPoints?.[0];
-    const displayName = firstPoint
-      ? formatPointName(firstPoint.name)
-      : getFlyoverDisplayName(flyover.type, index);
+      const firstPoint = flyover.namedPoints?.[0];
+      const displayName = firstPoint
+        ? formatPointName(firstPoint.name)
+        : getFlyoverDisplayName(flyover.type, index);
 
-    return {
-      ...flyover,
-      color: color,
-      displayName: displayName,
-    };
-  });
+      return {
+        ...flyover,
+        color: color,
+        displayName: displayName,
+      };
+    });
 
-  return markers;
-}, [flyoversList]);
+    return markers;
+  }, [flyoversList]);
   const visibleFlyoversFitData = useMemo(() => {
     const visible = flyoverMarkers.filter((f) => visibleFlyoverIds.has(f.id));
     if (visible.length === 0) return null;
@@ -362,7 +362,6 @@ const flyoverMarkers = useMemo(() => {
       return;
     }
 
-   
     (async () => {
       try {
         const newLayer = createIDWLayer(currentData, property, {
@@ -392,7 +391,6 @@ const flyoverMarkers = useMemo(() => {
 
         if (allMonthlyData?.length && !preRenderStartedRef.current) {
           preRenderStartedRef.current = true;
-
 
           newLayer
             .preRenderAllLayers(
@@ -581,13 +579,29 @@ const flyoverMarkers = useMemo(() => {
               sm:top-[75px]
             "
           >
-            <FullscreenButton
-              isFullscreen={isFullscreen}
-              onToggle={toggleFullscreen}
-            />
             <BaseLayerSwitcher
               activeLayer={baseLayer}
               onSelect={setBaseLayer}
+            />
+          </div>
+        )}
+
+        {!showTrafficMap && (
+          <div
+            className="
+              absolute
+              right-[10px]
+              top-2
+              z-[1500]
+              flex
+              flex-col
+              gap-2
+              sm:top-1
+            "
+          >
+            <FullscreenButton
+              isFullscreen={isFullscreen}
+              onToggle={toggleFullscreen}
             />
           </div>
         )}
@@ -599,9 +613,9 @@ const flyoverMarkers = useMemo(() => {
               absolute
               left-[19px]
               sm:left-[22px]
-              top-[150px]
+              top-[152px]
               z-[1500]
-              sm:top-[104px]
+              sm:top-[106px]
             "
           >
             <button
@@ -628,7 +642,7 @@ const flyoverMarkers = useMemo(() => {
             absolute
             top-2
             left-1
-            right-1
+            right-10
             z-[1500]
             flex
             flex-row
@@ -638,7 +652,7 @@ const flyoverMarkers = useMemo(() => {
             gap-2
             sm:top-3
             sm:left-auto
-            sm:right-3
+            sm:right-14
             overflow-visible
           "
         >
@@ -831,37 +845,39 @@ const flyoverMarkers = useMemo(() => {
         )}
       </div>
 
-      {!isFullscreen && !showTrafficMap && (selectedHighway || selectedPoint) && (
-        <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0 flex-shrink-0">
-          <div className="w-full h-full min-h-0 flex flex-col gap-3">
-            <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <FlyoverDetailsPanel
-                  selectedHighway={selectedHighway}
-                  selectedPoint={selectedPoint}
-                  flyoverMarkers={flyoverMarkers}
-                  visibleFlyoverIds={visibleFlyoverIds}
-                  onSelectHighway={handleSelectHighway}
-                  onSelectPoint={handleSelectPoint}
-                />
-                {(selectedHighway || selectedPoint) && (
-                  <div className="px-3">
-                    <p className="text-sm font-bold text-gray-700 mb-2 px-1">
-                      Weather
-                    </p>
-                    <div className="h-[480px]">
-                      <WeatherPanel
-                        weather={weather}
-                        loading={isWeatherLoading}
-                      />
+      {!isFullscreen &&
+        !showTrafficMap &&
+        (selectedHighway || selectedPoint) && (
+          <div className="w-full lg:w-[380px] shrink-0 h-[420px] lg:h-full min-h-0 flex-shrink-0">
+            <div className="w-full h-full min-h-0 flex flex-col gap-3">
+              <div className="flex-1 min-h-0 w-full rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 bg-white flex flex-col">
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <FlyoverDetailsPanel
+                    selectedHighway={selectedHighway}
+                    selectedPoint={selectedPoint}
+                    flyoverMarkers={flyoverMarkers}
+                    visibleFlyoverIds={visibleFlyoverIds}
+                    onSelectHighway={handleSelectHighway}
+                    onSelectPoint={handleSelectPoint}
+                  />
+                  {(selectedHighway || selectedPoint) && (
+                    <div className="px-3">
+                      <p className="text-sm font-bold text-gray-700 mb-2 px-1">
+                        Weather
+                      </p>
+                      <div className="h-[480px]">
+                        <WeatherPanel
+                          weather={weather}
+                          loading={isWeatherLoading}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

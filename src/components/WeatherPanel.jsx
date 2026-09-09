@@ -129,7 +129,7 @@ export default function WeatherPanel({ weather: weatherProp, loading, hourStep =
 
         <div className="flex items-start justify-between relative mb-3">
           <div>
-            <p className="text-[11px]  mb-0.5">Current conditions</p>
+            <p className="text-[11px]  mb-0.5">Current Weather</p>
             <div className="flex items-baseline gap-1">
               <span className="text-3xl font-bold leading-none">{weather.temp}°</span>
               <span className="text-sm ">C</span>
