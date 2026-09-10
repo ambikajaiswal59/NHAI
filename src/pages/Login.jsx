@@ -70,9 +70,9 @@ export default function Login({ onLoginSuccess }) {
     setIsForcing(true);
     try {
       await forceLogoutUser(username);
-      const data = await loginUser({ username, password });
+      // const data = await loginUser({ username, password });
       setShowForceLogoutModal(false);
-      completeLogin(data);
+      // completeLogin(data);
     } catch (err) {
       setShowForceLogoutModal(false);
       setError(
