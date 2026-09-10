@@ -1,13 +1,38 @@
 const BASE_URL = import.meta.env.VITE_API_BASE;
-const AUTH_BASE_URL = import.meta.env.VITE_AUTH_API_BASE;
+
+// ---------------------------------------------------------
+// Shared authenticated fetch wrapper
+// Attaches the Bearer token (stored in sessionStorage) to
+// every protected API call. If the server responds 401
+// (token invalid / session revoked by force_logout or a
+// login from another device), clears the stored session
+// and redirects to the login page.
+// ---------------------------------------------------------
+const authFetch = async (url, options = {}) => {
+  const token = sessionStorage.getItem("authToken");
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+  });
+
+  if (response.status === 401) {
+    sessionStorage.removeItem("authToken");
+    sessionStorage.removeItem("authUser");
+    window.location.href = "/login"; // adjust to your actual login route
+  }
+
+  return response;
+};
 
 // Send clicked map location to backend
 export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
-  const response = await fetch(`${BASE_URL}/weather/data`, {
+  const response = await authFetch(`${BASE_URL}/weather/data`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({
       id: flyoverId,
       lat: lat,
@@ -22,11 +47,8 @@ export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
 // fetch weather IDW data for a specific date
 // export const fetchIDWWeatherData = async (date) => {
 //   try {
-//     const response = await fetch(`${BASE_URL}/weather/idw`, {
+//     const response = await authFetch(`${BASE_URL}/weather/idw`, {
 //       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
 //       body: JSON.stringify({
 //         date: date, // Format: "2026-08-03"
 //       }),
@@ -46,17 +68,17 @@ export const sendLocationToAPI = async ({ flyoverId, lat, lng }) => {
 // };
 
 // api.js - Add new function
+
 export const fetchMonthlyWeatherData = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/rainfall/history`, {
+    const response = await authFetch(`${BASE_URL}/rainfall/history`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const err = new Error(`HTTP error! status: ${response.status}`);
+      err.status = response.status; // ← added
+      throw err;
     }
 
     const data = await response.json();
@@ -70,11 +92,8 @@ export const fetchMonthlyWeatherData = async () => {
 // Fetch traffic data for a specific flyover with optional date filter
 export const fetchTrafficData = async (flyoverName, selectedDate = null) => {
   try {
-    const response = await fetch(`${BASE_URL}/traffic/data`, {
+    const response = await authFetch(`${BASE_URL}/traffic/data`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         name: flyoverName,
         date: selectedDate, // Add date field (null for last 24 hours)
@@ -98,11 +117,8 @@ export const fetchTrafficData = async (flyoverName, selectedDate = null) => {
 // NEW: Fetch available dates for a flyover
 export const fetchTrafficDates = async (flyoverName) => {
   try {
-    const response = await fetch(`${BASE_URL}/traffic/dates/${flyoverName}`, {
+    const response = await authFetch(`${BASE_URL}/traffic/dates/${flyoverName}`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
     if (!response.ok) {
@@ -128,11 +144,8 @@ export const fetchTrafficDates = async (flyoverName) => {
  */
 export const fetchMovementPoints = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/points/data`, {
+    const response = await authFetch(`${BASE_URL}/points/data`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
     if (!response.ok) {
@@ -154,11 +167,8 @@ export const fetchMovementPoints = async () => {
  */
 export const fetchMovementPointById = async (pointId) => {
   try {
-    const response = await fetch(`${BASE_URL}/points/data/${pointId}`, {
+    const response = await authFetch(`${BASE_URL}/points/data/${pointId}`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
     if (!response.ok) {
@@ -173,12 +183,102 @@ export const fetchMovementPointById = async (pointId) => {
   }
 };
 
+// ============================================================
+// 🆕 FLYOVER SEGMENT APIs
+// ============================================================
+
+/**
+ * POST /get_live_segment
+ * Fetch live segment data (GeoJSON with LineString geometry)
+ * Used for displaying road segments on the map
+ */
+export const fetchLiveSegments = async () => {
+  try {
+    const response = await authFetch(`${BASE_URL}/get_live_segment`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching live segments:", error);
+    throw error;
+  }
+};
+
+
+/**
+ * POST /get_polygon_segment
+ * Fetch polygon segment data (GeoJSON with Polygon geometry)
+ * Can query by ID or location
+ * 
+ * @param {Object} params
+ * @param {string} params.type - 'id' or 'location'
+ * @param {string} [params.id] - Object ID when type is 'id'
+ * @param {number} [params.latitude] - Latitude when type is 'location'
+ * @param {number} [params.longitude] - Longitude when type is 'location'
+ */
+export const fetchPolygonSegment = async ({ type, id = null, latitude = null, longitude = null }) => {
+  try {
+    let url = `${BASE_URL}/get_polygon_segment?type=${type}`;
+
+    if (type === 'id' && id !== null) {
+      url += `&id=${id}`;
+    } else if (type === 'location' && latitude !== null && longitude !== null) {
+      url += `&latitude=${latitude}&longitude=${longitude}`;
+    }
+
+    const response = await authFetch(url, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching polygon segment:", error);
+    throw error;
+  }
+};
+
+/**
+ * POST /get_live_segment_stats
+ * Fetch live segment statistics (NO geometry)
+ * Useful for tables, charts, or data grids
+ * Returns: id, name, avg_velocity, point_count
+ */
+export const fetchLiveSegmentStats = async () => {
+  try {
+    const response = await authFetch(`${BASE_URL}/get_live_segment_stats`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching live segment stats:", error);
+    throw error;
+  }
+};
+
 // --- Mock auth block — remove once the real /auth/login endpoint exists ---
 // const MOCK_CREDENTIALS = {
 //   username: "admin",
 //   password: "nhai@2026",
 // };
 
+// NOTE: login must stay unauthenticated — no token exists yet at this point
 export const loginUser = async ({ username, password }) => {
   try {
     const params = new URLSearchParams({ username, password });
@@ -203,48 +303,11 @@ export const loginUser = async ({ username, password }) => {
   }
 };
 
-// export const loginUser = async ({ username, password }) => {
-//   const MOCK_CREDENTIALS = {
-//     username: "admin",
-//     password: "nhai@2026",
-//   };
-
-//   try {
-//     const params = new URLSearchParams({ username, password });
-//     const response = await fetch(`${AUTH_BASE_URL}/login?${params.toString()}`, {
-//       method: "POST",
-//     });
-
-//     if (!response.ok) {
-//       throw new Error(`HTTP error! status: ${response.status}`);
-//     }
-
-//     const data = await response.json();
-//     return data;
-//   } catch (error) {
-//     console.warn("Backend unreachable, using mock auth", error);
-
-//     // Mock authentication
-//     if (username === MOCK_CREDENTIALS.username && password === MOCK_CREDENTIALS.password) {
-//       return {
-//         success: true,
-//         user: {
-//           username: "admin",
-//           role: "admin",
-//           token: "mock-jwt-token-12345"
-//         }
-//       };
-//     } else {
-//       throw new Error("Invalid username or password");
-//     }
-//   }
-// };
-
 export const logoutUser = async () => {
   const token = sessionStorage.getItem("authToken"); // ✅ matches Login.jsx
 
   try {
-    const response = await fetch(`${AUTH_BASE_URL}/logout`, {
+    const response = await fetch(`${BASE_URL}/logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -263,6 +326,8 @@ export const logoutUser = async () => {
   }
 };
 
+// NOTE: not currently protected by get_current_user on the backend
+// (change_password lives in auth_routes, which is public). Left as-is.
 export const changePassword = async ({ username, newPassword }) => {
   try {
     const params = new URLSearchParams({
@@ -285,6 +350,8 @@ export const changePassword = async ({ username, newPassword }) => {
   }
 };
 
+// NOTE: not currently protected by get_current_user on the backend
+// (force_logout lives in auth_routes, which is public). Left as-is.
 export const forceLogoutUser = async (username) => {
   try {
     const params = new URLSearchParams({ username });
@@ -303,3 +370,6 @@ export const forceLogoutUser = async (username) => {
     throw error;
   }
 };
+
+
+
