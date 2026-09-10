@@ -185,7 +185,7 @@ function FullscreenControl({ containerRef }) {
         fullscreen ? (
           <Minimize size={15} className="text-gray-700" />
         ) : (
-          <Maximize2 size={15} className="text-gray-700" />
+          <Maximize size={15} className="text-gray-700" />
         ),
       );
     };
