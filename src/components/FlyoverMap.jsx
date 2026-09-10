@@ -18,8 +18,8 @@ import "leaflet/dist/leaflet.css";
 import {
   Maximize2,
   Minimize2,
-  Maximize,
   Minimize,
+  Maximize,
   CloudRain,
   Cloud,
   Sun,
@@ -183,9 +183,9 @@ function FullscreenControl({ containerRef }) {
       if (!root) return;
       root.render(
         fullscreen ? (
-          <Minimize size={16} className="text-gray-700" />
+          <Minimize size={15} className="text-gray-700" />
         ) : (
-          <Maximize size={16} className="text-gray-700" />
+          <Maximize2 size={15} className="text-gray-700" />
         ),
       );
     };

@@ -7,7 +7,6 @@ export default function FlyoverMarkers({
   flyoverMarkers,
   visibleFlyoverIds,
   isDetailZoom,
-  showLabels,
   isFullscreen,
   weather,
   weatherLoading,
@@ -46,7 +45,6 @@ export default function FlyoverMarkers({
                 detailed: isDetailZoom,
                 name: displayName,
                 detailFields: getPointDetailFields(point),
-                labelposition: 'right',
               })}
               eventHandlers={{ click: () => onSelectPoint(point, flyover) }}
             >

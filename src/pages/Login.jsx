@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Lock, User, Eye, EyeOff } from "lucide-react";
 
 import NHAILOGO from "../assets/NHAILOGO.png";
-import { loginUser } from "../services/api";
+import { loginUser, forceLogoutUser } from "../services/api";
 import TechBackground from "../components/TechBackground";
+import ForceLogoutModal from "../components/ForceLogoutModal"; // adjust path to where you save it
 
 export default function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState("");
@@ -15,6 +16,25 @@ export default function Login({ onLoginSuccess }) {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // NEW: force-logout modal state
+  const [showForceLogoutModal, setShowForceLogoutModal] = useState(false);
+  const [isForcing, setIsForcing] = useState(false);
+
+  const completeLogin = (data) => {
+    const loggedInUser = {
+      name: data.name,
+      username: data.username,
+      email: data.email,
+      role: data.role,
+      userId: data.user_id,
+    };
+
+    sessionStorage.setItem("authToken", data.access_token);
+    sessionStorage.setItem("authUser", JSON.stringify(loggedInUser));
+
+    onLoginSuccess?.(loggedInUser);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,90 +49,72 @@ export default function Login({ onLoginSuccess }) {
     setLoading(true);
 
     try {
-      const data = await loginUser({
-        username,
-        password,
-      });
-
-      const loggedInUser = {
-        name: data.name,
-        username: data.username,
-        email: data.email,
-        role: data.role,
-        userId: data.user_id,
-      };
-
-      sessionStorage.setItem("authToken", data.access_token);
-
-      sessionStorage.setItem("authUser", JSON.stringify(loggedInUser));
-
-      onLoginSuccess?.(loggedInUser);
+      const data = await loginUser({ username, password });
+      completeLogin(data);
     } catch (err) {
-      setError(
-        err.message ||
-          "Couldn't sign in. Check your credentials and try again.",
-      );
+      if (err.status === 409) {
+        // Already logged in elsewhere — offer to force logout instead of a generic error
+        setShowForceLogoutModal(true);
+      } else {
+        setError(
+          err.message ||
+            "Couldn't sign in. Check your credentials and try again.",
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleForceLogout = async () => {
+    setIsForcing(true);
+    try {
+      await forceLogoutUser(username);
+      const data = await loginUser({ username, password });
+      setShowForceLogoutModal(false);
+      completeLogin(data);
+    } catch (err) {
+      setShowForceLogoutModal(false);
+      setError(
+        err.message || "Could not force logout the other session. Try again.",
+      );
+    } finally {
+      setIsForcing(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#0b1329] flex items-center justify-center px-6 py-12">
-      {/* =====================================================
-          ANIMATED NHAI TECH BACKGROUND
-      ====================================================== */}
       <TechBackground />
 
-      {/* =====================================================
-          LOGIN CONTENT
-      ====================================================== */}
       <div className="relative z-10 w-full max-w-sm">
-        {/* Login Card */}
         <div className="bg-white/95 backdrop-blur-md rounded-xl border border-white/30 shadow-2xl px-8 py-9">
-          {/* NHAI 3D LOGO */}
-          {/* NHAI 3D LOGO */}
           <div className="flex justify-center mb-6">
             <div className="relative group">
-              {/* Outer glow */}
               <div className="absolute -inset-4 rounded-full bg-cyan-400/20 blur-2xl opacity-70" />
-
-              {/* ROTATING OUTER RING */}
               <div className="absolute -inset-[4px] rounded-full animate-[spin_8s_linear_infinite]">
                 <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cyan-300 border-r-blue-500 border-b-cyan-500" />
-
-                {/* Rotating highlight */}
                 <div className="absolute -top-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_14px_#00f0ff]" />
               </div>
-
-              {/* SECOND ROTATING RING - opposite direction */}
               <div className="absolute -inset-[8px] rounded-full animate-[spin_14s_linear_infinite_reverse]">
                 <div className="absolute inset-0 rounded-full border border-cyan-400/30 border-l-transparent border-b-transparent" />
               </div>
-
-              {/* Main 3D circular body */}
               <div
                 className="relative h-24 w-24 rounded-full p-[3px]
       bg-gradient-to-br from-cyan-300 via-blue-600 to-cyan-800
       shadow-[0_0_30px_rgba(0,240,255,0.4)]"
               >
-                {/* Dark inner surface */}
                 <div
                   className="relative h-full w-full rounded-full
         bg-gradient-to-br from-[#102a4c] via-[#0b1935] to-[#06101f]
         flex items-center justify-center overflow-hidden"
                 >
-                  {/* Static inner technical rings */}
                   <div className="absolute inset-[5px] rounded-full border border-cyan-300/30" />
                   <div className="absolute inset-[9px] rounded-full border border-cyan-400/10" />
-
-                  {/* Glass reflection */}
                   <div
                     className="absolute -top-8 left-3 w-16 h-12
           bg-white/20 rounded-full blur-xl rotate-[-25deg]"
                   />
-
-                  {/* NHAI logo - stays completely still */}
                   <div
                     className="relative h-16 w-16 rounded-full
           bg-white flex items-center justify-center
@@ -126,8 +128,6 @@ export default function Login({ onLoginSuccess }) {
               drop-shadow-[0_3px_4px_rgba(0,0,0,0.25)]"
                     />
                   </div>
-
-                  {/* Bottom cyan reflection */}
                   <div
                     className="absolute bottom-0 left-1/2
           -translate-x-1/2 w-14 h-3
@@ -135,14 +135,11 @@ export default function Login({ onLoginSuccess }) {
                   />
                 </div>
               </div>
-
-              {/* Orbiting dots */}
               <span
                 className="absolute top-0 right-0 h-2 w-2 rounded-full
         bg-cyan-300 shadow-[0_0_12px_#00f0ff]
         animate-pulse"
               />
-
               <span
                 className="absolute bottom-1 left-0 h-1.5 w-1.5 rounded-full
         bg-blue-400 shadow-[0_0_8px_#008cff]
@@ -151,8 +148,7 @@ export default function Login({ onLoginSuccess }) {
               />
             </div>
           </div>
-          {/* Project Title */}
-          {/* Project Title & Tagline */}
+
           <div className="text-center mb-6 px-1 w-full">
             <h1
               className="
@@ -187,29 +183,21 @@ export default function Login({ onLoginSuccess }) {
     "
             >
               <span className="text-slate-400">•</span>
-
               <span className="text-blue-600 whitespace-nowrap">
                 Smart Monitoring
               </span>
-
               <span className="text-slate-400">•</span>
-
               <span className="text-green-600 whitespace-nowrap">
                 Predictive Insights
               </span>
-
               <span className="text-slate-400">•</span>
-
               <span className="text-orange-600 whitespace-nowrap">
                 Safer Highways
               </span>
             </div>
           </div>
-          {/* =================================================
-              LOGIN FORM
-          ================================================== */}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* USERNAME */}
             <div>
               <label
                 htmlFor="username"
@@ -217,10 +205,8 @@ export default function Login({ onLoginSuccess }) {
               >
                 Username
               </label>
-
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-
                 <input
                   id="username"
                   type="text"
@@ -233,7 +219,6 @@ export default function Login({ onLoginSuccess }) {
               </div>
             </div>
 
-            {/* PASSWORD */}
             <div>
               <label
                 htmlFor="password"
@@ -241,10 +226,8 @@ export default function Login({ onLoginSuccess }) {
               >
                 Password
               </label>
-
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -254,7 +237,6 @@ export default function Login({ onLoginSuccess }) {
                   placeholder="••••••••"
                   className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 bg-white/90 focus:outline-none focus:ring-2 focus:ring-[#1D5FD1]/30 focus:border-[#1D5FD1]"
                 />
-
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
@@ -270,14 +252,12 @@ export default function Login({ onLoginSuccess }) {
               </div>
             </div>
 
-            {/* ERROR */}
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
 
-            {/* SIGN IN */}
             <button
               type="submit"
               disabled={loading}
@@ -288,11 +268,20 @@ export default function Login({ onLoginSuccess }) {
           </form>
         </div>
 
-        {/* AUTHORIZATION NOTICE */}
         <p className="mt-6 text-center text-xs text-white/60">
           Authorized personnel only. Access is logged and monitored.
         </p>
       </div>
+
+      {/* NEW: Force logout modal */}
+      {showForceLogoutModal && (
+        <ForceLogoutModal
+          username={username}
+          isLoading={isForcing}
+          onConfirm={handleForceLogout}
+          onCancel={() => setShowForceLogoutModal(false)}
+        />
+      )}
     </div>
   );
 }
