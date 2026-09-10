@@ -1,7 +1,8 @@
 import proj4 from 'proj4';
+const BASE = import.meta.env.BASE_URL;
 
-const ROADS_GEOJSON_PATH = '/data/Flyover_Roads.geojson';
-const NAMES_GEOJSON_PATH = '/data/FlyOver_Name.geojson';
+const ROADS_GEOJSON_PATH = `${BASE}data/Flyover_Roads.geojson`;
+const NAMES_GEOJSON_PATH = `${BASE}data/FlyOver_Name.geojson`;
 
 const UTM43N = '+proj=utm +zone=43 +datum=WGS84 +units=m +no_defs';
 const WGS84 = 'EPSG:4326';
@@ -200,7 +201,7 @@ export const loadFlyoverData = async () => {
     }
 };
 
-export const getStatsFromFlyovers = (flyovers) => { 
+export const getStatsFromFlyovers = (flyovers) => {
     const total = flyovers.length;
     const low = flyovers.filter(f => f.riskStatus === 'low').length;
     const moderate = flyovers.filter(f => f.riskStatus === 'moderate').length;

@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+const BASE = import.meta.env.BASE_URL;
 import { useFlyoverData } from "../hooks/useFlyoverData";
 import { useMovementPoints } from "../hooks/useMovementPoints";
 import { useFlyoverSegments } from '../hooks/useFlyoverSegments';
@@ -40,12 +41,12 @@ const DEBUG = false;
 const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
 
 const TILE_LAYER_URL =
-  "https://mlinfomap.org/nhaiapi/tiles/{year}/{z}/{x}/{y}.png";
+  "https://mlinfomap.com/nhflyoverapi/tiles/{year}/{z}/{x}/{y}.png";
 
 const DEFAULT_CENTER = [30.3, 76.7];
 const DEFAULT_ZOOM = 10;
 const MIN_ZOOM = 9;
-const MAX_ZOOM = 19;
+const MAX_ZOOM = 18;
 
 // How long the LULC show/hide crossfade takes (ms)
 const LULC_FADE_MS = 250;
@@ -1526,8 +1527,6 @@ export default function LandUseLandCover({
         }
       } else {
         setActiveLayers(prev => [...prev, "linear"]);
-        // REMOVED: setShowSegmentTable(true);
-        // REMOVED: setShowSegmentLegend(true);
 
         // Load segment data if needed
         if (!liveSegments || !liveSegments.features || liveSegments.features.length === 0) {
@@ -1698,7 +1697,7 @@ export default function LandUseLandCover({
         setSoilLoading(true);
         setSoilError(null);
 
-        const response = await fetch("/data/Soil.geojson");
+        const response = await fetch(`${BASE}data/Soil.geojson`);
         if (!response.ok) {
           throw new Error(`Failed to load soil data: ${response.status}`);
         }
