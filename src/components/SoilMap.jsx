@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Loader2, AlertTriangle, Maximize, Minimize, Layers, X } from "lucide-react";
+const BASE = import.meta.env.BASE_URL;
 import { useFlyoverData } from "../hooks/useFlyoverData";
 import {
     getFlyoverColor,
@@ -10,6 +11,7 @@ import {
     makeFlyoverIcon,
     formatPointName,
 } from "./map/mapHelpers";
+
 
 // Add these constants
 const DEFAULT_SOIL_MAP_CENTER = [30.3, 76.7];
@@ -229,7 +231,7 @@ export default function SoilMap({
     useEffect(() => {
         const fetchSoilData = async () => {
             try {
-                const response = await fetch('/data/Soil.geojson');
+                const response = await fetch(`${BASE}data/Soil.geojson`);
                 if (!response.ok) throw new Error(`Failed to load soil data: ${response.status}`);
                 const data = await response.json();
                 soilDataRef.current = data;

@@ -19,14 +19,15 @@ import { ROUTES } from "../router/routes";
 // NOTE: make sure these keys exist in ../router/routes.js
 // (FLYOVERS, MONITORING, ALERTS, ANALYTICS, INSPECTIONS, REPORTS, WEATHER, INTEGRATIONS, SETTINGS)
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.HOME },
-  { label: "Flyovers", icon: Waypoints, id: ROUTES.DASHBOARD },
-  { label: "Topography", icon: Mountain, id: ROUTES.Topography },
+  // { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.HOME },
+  { label: "Dashboard", icon: LayoutDashboard, id: ROUTES.DASHBOARD },
+  { label: "InfraRisk", icon: Mountain, id: ROUTES.Topography },
   { label: "Traffic", icon: TrafficCone, id: ROUTES.TRAFFIC },
-  { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
   { label: "Weather", icon: CloudSun, id: ROUTES.WEATHER },
+  { label: "Reports", icon: FileText, id: ROUTES.REPORTS },
+
   //{ label: "Monitoring", icon: Radar, id: ROUTES.MONITORING },
-  { label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }, // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
+  //{ label: "Alerts", icon: Bell, badge: 3, id: ROUTES.ALERTS }, // { label: "Integrations", icon: Puzzle, id: ROUTES.INTEGRATIONS },
 ];
 
 export default function Sidebar({ activeItem, onNavClick, onClose }) {
@@ -41,7 +42,7 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
     <aside className="w-37 h-screen  bg-[#0a1130] flex flex-col">
       <div>
         {/* Navigation */}
-        <nav className="mt-4 px-6 space-y-3">
+        <nav className="mt-4 px-6 space-y-7">
           {navItems.map(({ label, icon: Icon, id, badge }) => {
             const isActive = activeItem === id;
             return (
@@ -49,12 +50,13 @@ export default function Sidebar({ activeItem, onNavClick, onClose }) {
                 key={label}
                 disabled={!id}
                 onClick={() => id && handleNavClick(id)}
-                className={`group relative w-full flex flex-col items-center justify-center  py-2 rounded-xl text-[14px] font-medium transition-all duration-200 ${!id
-                  ? "cursor-not-allowed opacity-50"
-                  : isActive
-                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-900/40"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  }`}
+                className={`group relative w-full flex flex-col items-center justify-center  py-2 rounded-xl text-[14px] font-medium transition-all duration-200 ${
+                  !id
+                    ? "cursor-not-allowed opacity-50"
+                    : isActive
+                      ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-900/40"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                }`}
               >
                 <Icon
                   size={24}

@@ -5,7 +5,7 @@ import Login from "./pages/Login";
 import { ROUTES, getPageComponent } from "./router/routes";
 
 function App() {
-  const [activeNav, setActiveNav] = useState(ROUTES.HOME);
+  const [activeNav, setActiveNav] = useState(ROUTES.DASHBOARD);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState(null);

@@ -3,7 +3,7 @@ import { Waypoints, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-reac
 const cardConfig = [
   {
     key: "total",
-    label: "Flyovers",
+    label: "Assets",
     icon: Waypoints,
     accent: "border-primary",
     iconBg: "bg-primary/10",
