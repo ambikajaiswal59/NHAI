@@ -21,7 +21,7 @@ import {
 const BASE = import.meta.env.BASE_URL;
 import { useFlyoverData } from "../hooks/useFlyoverData";
 import { useMovementPoints } from "../hooks/useMovementPoints";
-import { useFlyoverSegments } from '../hooks/useFlyoverSegments';
+import { useFlyoverSegments } from "../hooks/useFlyoverSegments";
 import {
   getFlyoverColor,
   getFlyoverDisplayName,
@@ -41,12 +41,12 @@ const DEBUG = false;
 const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
 
 const TILE_LAYER_URL =
-  "https://mlinfomap.com/nhflyoverapi/tiles/{year}/{z}/{x}/{y}.png";
+  "https://mlinfomap.org/nhaiapi/tiles/{year}/{z}/{x}/{y}.png";
 
 const DEFAULT_CENTER = [30.3, 76.7];
 const DEFAULT_ZOOM = 10;
 const MIN_ZOOM = 9;
-const MAX_ZOOM = 18;
+const MAX_ZOOM = 19;
 
 // How long the LULC show/hide crossfade takes (ms)
 const LULC_FADE_MS = 250;
@@ -302,7 +302,10 @@ function SoilLegend({ taxoValues }) {
       </div>
       <div className="flex flex-col gap-1 max-[480px]:gap-0.5">
         {taxoValues.map((taxo) => (
-          <div key={taxo} className="flex items-center gap-2 max-[480px]:gap-1.5">
+          <div
+            key={taxo}
+            className="flex items-center gap-2 max-[480px]:gap-1.5"
+          >
             <span
               className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-400 max-[480px]:w-2.5 max-[480px]:h-2.5"
               style={{ backgroundColor: getSoilColor({ S_TAXO: taxo }) }}
@@ -352,10 +355,11 @@ function FullscreenButton({ isFullscreen, onToggle }) {
   return (
     <button
       onClick={onToggle}
-      className={`flex items-center justify-center w-[30px] h-[30px] bg-white rounded-md shadow-md border border-gray-200 transition-all duration-200 hover:bg-gray-50 hover:shadow-lg max-[480px]:w-[26px] max-[480px]:h-[26px] ${isFullscreen
-        ? "bg-blue-50 border-blue-300 text-blue-600"
-        : "text-gray-700"
-        }`}
+      className={`flex items-center justify-center w-[30px] h-[30px] bg-white rounded-md shadow-md border border-gray-200 transition-all duration-200 hover:bg-gray-50 hover:shadow-lg max-[480px]:w-[26px] max-[480px]:h-[26px] ${
+        isFullscreen
+          ? "bg-blue-50 border-blue-300 text-blue-600"
+          : "text-gray-700"
+      }`}
       aria-label="Toggle fullscreen"
     >
       {isFullscreen ? (
@@ -425,8 +429,9 @@ function LayerSelector({ selectedLayer, onLayerChange }) {
         <span>{getLayerLabel(selectedLayer)}</span>
         <ChevronDown
           size={12}
-          className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""
-            }`}
+          className={`transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
         />
       </button>
       {isOpen && (
@@ -438,10 +443,11 @@ function LayerSelector({ selectedLayer, onLayerChange }) {
                 onLayerChange(opt);
                 setIsOpen(false);
               }}
-              className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${selectedLayer === opt
-                ? "bg-blue-50 text-blue-700 font-medium"
-                : "text-gray-700"
-                }`}
+              className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors text-xs ${
+                selectedLayer === opt
+                  ? "bg-blue-50 text-blue-700 font-medium"
+                  : "text-gray-700"
+              }`}
             >
               {getLayerLabel(opt)}
             </button>
@@ -497,8 +503,9 @@ function DateRangeSelector({
           </span>
           <ChevronDown
             size={12}
-            className={`text-gray-400 transition-transform ${isStartOpen ? "rotate-180" : ""
-              }`}
+            className={`text-gray-400 transition-transform ${
+              isStartOpen ? "rotate-180" : ""
+            }`}
           />
         </button>
         {isStartOpen && availableDates.length > 0 && (
@@ -519,10 +526,11 @@ function DateRangeSelector({
                     onEndDateChange(date);
                   }
                 }}
-                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${startDate === date
-                  ? "bg-blue-100 text-blue-700 font-medium"
-                  : "text-gray-700"
-                  }`}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${
+                  startDate === date
+                    ? "bg-blue-100 text-blue-700 font-medium"
+                    : "text-gray-700"
+                }`}
               >
                 {formatDisplayDate(date)}
               </button>
@@ -541,8 +549,9 @@ function DateRangeSelector({
           </span>
           <ChevronDown
             size={12}
-            className={`text-gray-400 transition-transform ${isEndOpen ? "rotate-180" : ""
-              }`}
+            className={`text-gray-400 transition-transform ${
+              isEndOpen ? "rotate-180" : ""
+            }`}
           />
         </button>
         {isEndOpen && availableDates.length > 0 && (
@@ -562,10 +571,11 @@ function DateRangeSelector({
                     onEndDateChange(date);
                     setIsEndOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${endDate === date
-                    ? "bg-blue-100 text-blue-700 font-medium"
-                    : "text-gray-700"
-                    }`}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors ${
+                    endDate === date
+                      ? "bg-blue-100 text-blue-700 font-medium"
+                      : "text-gray-700"
+                  }`}
                 >
                   {formatDisplayDate(date)}
                 </button>
@@ -607,10 +617,18 @@ function SegmentTable({ data, onRowClick, selectedId, loading }) {
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0 bg-gray-100 z-10">
           <tr>
-            <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b border-gray-200">ID</th>
-            <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b border-gray-200">Name</th>
-            <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-b border-gray-200">Velocity (mm/yr)</th>
-            <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-b border-gray-200">Points</th>
+            <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b border-gray-200">
+              ID
+            </th>
+            <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b border-gray-200">
+              Name
+            </th>
+            <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-b border-gray-200">
+              Velocity (mm/yr)
+            </th>
+            <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-b border-gray-200">
+              Points
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -618,18 +636,23 @@ function SegmentTable({ data, onRowClick, selectedId, loading }) {
             <tr
               key={item.id}
               onClick={() => onRowClick(item.id)}
-              className={`cursor-pointer hover:bg-blue-50 transition-colors ${selectedId === item.id ? 'bg-blue-100' : ''
-                } ${item.avg_velocity === null ? 'opacity-50' : ''}`}
+              className={`cursor-pointer hover:bg-blue-50 transition-colors ${
+                selectedId === item.id ? "bg-blue-100" : ""
+              } ${item.avg_velocity === null ? "opacity-50" : ""}`}
             >
-              <td className="px-2 py-1.5 border-b border-gray-100">{item.id}</td>
-              <td className="px-2 py-1.5 border-b border-gray-100 font-medium">{item.name}</td>
+              <td className="px-2 py-1.5 border-b border-gray-100">
+                {item.id}
+              </td>
+              <td className="px-2 py-1.5 border-b border-gray-100 font-medium">
+                {item.name}
+              </td>
               <td className="px-2 py-1.5 border-b border-gray-100 text-right">
                 {item.avg_velocity !== null ? (
                   <span
                     className="px-1.5 py-0.5 rounded text-[10px] font-medium"
                     style={{
-                      backgroundColor: '#2563eb',
-                      color: 'white',
+                      backgroundColor: "#2563eb",
+                      color: "white",
                     }}
                   >
                     {item.avg_velocity.toFixed(2)}
@@ -638,7 +661,9 @@ function SegmentTable({ data, onRowClick, selectedId, loading }) {
                   <span className="text-gray-400">N/A</span>
                 )}
               </td>
-              <td className="px-2 py-1.5 border-b border-gray-100 text-right">{item.point_count || 0}</td>
+              <td className="px-2 py-1.5 border-b border-gray-100 text-right">
+                {item.point_count || 0}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -646,7 +671,6 @@ function SegmentTable({ data, onRowClick, selectedId, loading }) {
     </div>
   );
 }
-
 
 /* ============================================================================
  * MAIN COMPONENT
@@ -774,9 +798,7 @@ export default function LandUseLandCover({
     getVelocityColor: getSegVelocityColor,
   } = useFlyoverSegments();
 
-
   const availableLayers = [
-
     {
       id: "linear",
       name: "Assets",
@@ -814,9 +836,16 @@ export default function LandUseLandCover({
 
   // Add polygon highlight layer
   const addPolygonHighlight = useCallback((map, polygonData) => {
-    if (!polygonData || !polygonData.features || polygonData.features.length === 0) {
+    if (
+      !polygonData ||
+      !polygonData.features ||
+      polygonData.features.length === 0
+    ) {
       // Remove existing highlight
-      if (selectedPolygonLayerRef.current && map.hasLayer(selectedPolygonLayerRef.current)) {
+      if (
+        selectedPolygonLayerRef.current &&
+        map.hasLayer(selectedPolygonLayerRef.current)
+      ) {
         map.removeLayer(selectedPolygonLayerRef.current);
         selectedPolygonLayerRef.current = null;
       }
@@ -824,19 +853,22 @@ export default function LandUseLandCover({
     }
 
     // Remove existing highlight
-    if (selectedPolygonLayerRef.current && map.hasLayer(selectedPolygonLayerRef.current)) {
+    if (
+      selectedPolygonLayerRef.current &&
+      map.hasLayer(selectedPolygonLayerRef.current)
+    ) {
       map.removeLayer(selectedPolygonLayerRef.current);
     }
 
     // Create highlight layer
     selectedPolygonLayerRef.current = L.geoJSON(polygonData, {
       style: {
-        color: '#ff6b6b',
+        color: "#ff6b6b",
         weight: 4,
         opacity: 1,
-        fillColor: '#ff6b6b',
+        fillColor: "#ff6b6b",
         fillOpacity: 0.3,
-        dashArray: '5, 5',
+        dashArray: "5, 5",
       },
       onEachFeature: (feature, layer) => {
         const props = feature?.properties || {};
@@ -845,12 +877,12 @@ export default function LandUseLandCover({
         layer.bindPopup(`
           <div style="padding: 8px; font-family: Arial, sans-serif; min-width: 180px;">
             <h4 style="margin: 0 0 6px 0; color: #1f2937; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">
-              ${props.name || 'Unknown Polygon Segment'}
+              ${props.name || "Unknown Polygon Segment"}
             </h4>
             <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
               <tr>
                 <td style="padding: 2px 0; color: #6b7280;">ID:</td>
-                <td style="padding: 2px 0; font-weight: 600;">${props.objectid || 'N/A'}</td>
+                <td style="padding: 2px 0; font-weight: 600;">${props.objectid || "N/A"}</td>
               </tr>
               <tr>
                 <td style="padding: 2px 0; color: #6b7280;">Type:</td>
@@ -859,19 +891,23 @@ export default function LandUseLandCover({
               <tr>
                 <td style="padding: 2px 0; color: #6b7280;">Velocity:</td>
                 <td style="padding: 2px 0; font-weight: 600; color: #2563eb;">
-                  ${velocity !== null && velocity !== undefined ? velocity + ' mm/yr' : 'N/A'}
+                  ${velocity !== null && velocity !== undefined ? velocity + " mm/yr" : "N/A"}
                 </td>
               </tr>
-              ${props.insert_at ? `
+              ${
+                props.insert_at
+                  ? `
               <tr>
                 <td style="padding: 2px 0; color: #6b7280;">Updated:</td>
                 <td style="padding: 2px 0; font-weight: 600; font-size: 10px;">${new Date(props.insert_at).toLocaleString()}</td>
               </tr>
-              ` : ''}
+              `
+                  : ""
+              }
             </table>
           </div>
         `);
-      }
+      },
     }).addTo(map);
 
     selectedPolygonLayerRef.current.setZIndex(450);
@@ -883,86 +919,106 @@ export default function LandUseLandCover({
         map.fitBounds(bounds, { padding: [50, 50] });
       }
     } catch (err) {
-      console.warn('Could not fit to polygon bounds:', err);
+      console.warn("Could not fit to polygon bounds:", err);
     }
   }, []);
 
   // Handle segment row click
-  const handleSegmentRowClick = useCallback(async (id) => {
-    if (!id) return;
+  const handleSegmentRowClick = useCallback(
+    async (id) => {
+      if (!id) return;
 
-    setSelectedSegmentId(id);
-    setPolygonLoading(true);
+      setSelectedSegmentId(id);
+      setPolygonLoading(true);
 
-    try {
-      const polygonData = await loadPolygonSegment({ type: 'id', id: String(id) });
+      try {
+        const polygonData = await loadPolygonSegment({
+          type: "id",
+          id: String(id),
+        });
 
-      if (polygonData && polygonData.features && polygonData.features.length > 0) {
-        // Add polygon highlight to map
-        if (mapRef.current) {
-          addPolygonHighlight(mapRef.current, polygonData);
+        if (
+          polygonData &&
+          polygonData.features &&
+          polygonData.features.length > 0
+        ) {
+          // Add polygon highlight to map
+          if (mapRef.current) {
+            addPolygonHighlight(mapRef.current, polygonData);
+          }
+        } else {
+          // Remove highlight if no polygon found
+          if (mapRef.current) {
+            addPolygonHighlight(mapRef.current, null);
+          }
         }
-      } else {
-        // Remove highlight if no polygon found
-        if (mapRef.current) {
-          addPolygonHighlight(mapRef.current, null);
-        }
+      } catch (err) {
+        console.error("Error loading polygon segment:", err);
+      } finally {
+        setPolygonLoading(false);
       }
-    } catch (err) {
-      console.error('Error loading polygon segment:', err);
-    } finally {
-      setPolygonLoading(false);
-    }
-  }, [loadPolygonSegment, addPolygonHighlight]);
+    },
+    [loadPolygonSegment, addPolygonHighlight],
+  );
 
   // Add live segment layer to map
-  const addLiveSegmentLayer = useCallback((map) => {
-    if (!liveSegments || !liveSegments.features || liveSegments.features.length === 0) {
-      console.log('No live segments data to display');
-      return;
-    }
+  const addLiveSegmentLayer = useCallback(
+    (map) => {
+      if (
+        !liveSegments ||
+        !liveSegments.features ||
+        liveSegments.features.length === 0
+      ) {
+        console.log("No live segments data to display");
+        return;
+      }
 
-    // Remove existing layer
-    if (liveSegmentLayerRef.current && map.hasLayer(liveSegmentLayerRef.current)) {
-      map.removeLayer(liveSegmentLayerRef.current);
-      liveSegmentLayerRef.current = null;
-    }
+      // Remove existing layer
+      if (
+        liveSegmentLayerRef.current &&
+        map.hasLayer(liveSegmentLayerRef.current)
+      ) {
+        map.removeLayer(liveSegmentLayerRef.current);
+        liveSegmentLayerRef.current = null;
+      }
 
-    console.log(`Adding ${liveSegments.features.length} segment features to map`);
+      console.log(
+        `Adding ${liveSegments.features.length} segment features to map`,
+      );
 
-    // Create new layer with proper GeoJSON handling
-    liveSegmentLayerRef.current = L.geoJSON(liveSegments, {
-      // Style for LineString features
-      style: (feature) => {
-        return {
-          color: '#2563eb', // Blue color
-          weight: 7,
-          opacity: 0.9,
-          lineCap: 'round',
-          lineJoin: 'round',
-        };
-      },
-      // Filter to only include LineString geometries
-      filter: (feature) => {
-        return feature?.geometry?.type === 'LineString';
-      },
-      onEachFeature: (feature, layer) => {
-        const props = feature?.properties || {};
-        const velocity = props.avg_velocity;
+      // Create new layer with proper GeoJSON handling
+      liveSegmentLayerRef.current = L.geoJSON(liveSegments, {
+        // Style for LineString features
+        style: (feature) => {
+          return {
+            color: "#2563eb", // Blue color
+            weight: 20,
+            opacity: 0.9,
+            lineCap: "round",
+            lineJoin: "round",
+          };
+        },
+        // Filter to only include LineString geometries
+        filter: (feature) => {
+          return feature?.geometry?.type === "LineString";
+        },
+        onEachFeature: (feature, layer) => {
+          const props = feature?.properties || {};
+          const velocity = props.avg_velocity;
 
-        if (feature?.geometry?.type !== 'LineString') {
-          return;
-        }
+          if (feature?.geometry?.type !== "LineString") {
+            return;
+          }
 
-        layer.bindPopup(`
+          layer.bindPopup(`
         <div style="padding: 8px; font-family: Arial, sans-serif; min-width: 180px;">
           <h4 style="margin: 0 0 6px 0; color: #1f2937; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">
-            ${props.name || 'Unknown Segment'}
+            ${props.name || "Unknown Segment"}
           </h4>
           <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
             <tr>
               <td style="padding: 2px 0; color: #6b7280;">ID:</td>
-              <td style="padding: 2px 0; font-weight: 600;">${props.objectid || 'N/A'}</td>
+              <td style="padding: 2px 0; font-weight: 600;">${props.objectid || "N/A"}</td>
             </tr>
             <tr>
               <td style="padding: 2px 0; color: #6b7280;">Type:</td>
@@ -971,62 +1027,73 @@ export default function LandUseLandCover({
             <tr>
               <td style="padding: 2px 0; color: #6b7280;">Velocity:</td>
               <td style="padding: 2px 0; font-weight: 600; color: #2563eb;">
-                ${velocity !== null && velocity !== undefined ? velocity + ' mm/yr' : 'N/A'}
+                ${velocity !== null && velocity !== undefined ? velocity + " mm/yr" : "N/A"}
               </td>
             </tr>
             <tr>
               <td style="padding: 2px 0; color: #6b7280;">Direction:</td>
-              <td style="padding: 2px 0; font-weight: 600;">${props.direction || 'N/A'}</td>
+              <td style="padding: 2px 0; font-weight: 600;">${props.direction || "N/A"}</td>
             </tr>
-            ${props.insert_at ? `
+            ${
+              props.insert_at
+                ? `
             <tr>
               <td style="padding: 2px 0; color: #6b7280;">Updated:</td>
               <td style="padding: 2px 0; font-weight: 600; font-size: 10px;">${new Date(props.insert_at).toLocaleString()}</td>
             </tr>
-            ` : ''}
+            `
+                : ""
+            }
           </table>
         </div>
       `);
 
-        layer.on({
-          mouseover: (e) => {
-            const layer = e.target;
-            layer.setStyle({
-              weight: 5,
-              opacity: 1,
-              color: '#ff6b6b',
-            });
-            layer.openPopup();
-          },
-          mouseout: (e) => {
-            const layer = e.target;
-            layer.setStyle({
-              color: '#2563eb',
-              weight: 7,
-              opacity: 0.9,
-            });
-            layer.closePopup();
-          },
-          click: (e) => {
-            const id = parseInt(feature?.properties?.objectid);
-            if (id) {
-              handleSegmentRowClick(id);
-            }
-          },
-        });
-      }
-    }).addTo(map);
+          layer.on({
+            mouseover: (e) => {
+              const layer = e.target;
+              layer.setStyle({
+                weight: 5,
+                opacity: 1,
+                color: "#ff6b6b",
+              });
+              layer.openPopup();
+            },
+            mouseout: (e) => {
+              const layer = e.target;
+              layer.setStyle({
+                color: "#2563eb",
+                weight: 7,
+                opacity: 0.9,
+              });
+              layer.closePopup();
+            },
+            click: (e) => {
+              const id = parseInt(feature?.properties?.objectid);
+              if (id) {
+                handleSegmentRowClick(id);
+              }
+            },
+          });
+        },
+      }).addTo(map);
 
-    liveSegmentLayerRef.current.setZIndex(400);
-    console.log(`Segment layer added successfully with ${liveSegments.features.length} features`);
-  }, [liveSegments, handleSegmentRowClick]);
+      liveSegmentLayerRef.current.setZIndex(400);
+      console.log(
+        `Segment layer added successfully with ${liveSegments.features.length} features`,
+      );
+    },
+    [liveSegments, handleSegmentRowClick],
+  );
 
   // Update segment layer when liveSegments changes
   useEffect(() => {
     if (!mapRef.current || !isMapReadyRef.current) return;
     if (!showSegmentsUI) {
       // Remove segment layer if not visible
-      if (liveSegmentLayerRef.current && mapRef.current.hasLayer(liveSegmentLayerRef.current)) {
+      if (
+        liveSegmentLayerRef.current &&
+        mapRef.current.hasLayer(liveSegmentLayerRef.current)
+      ) {
         mapRef.current.removeLayer(liveSegmentLayerRef.current);
         liveSegmentLayerRef.current = null;
       }
@@ -1048,7 +1115,10 @@ export default function LandUseLandCover({
   useEffect(() => {
     if (!mapRef.current || !isMapReadyRef.current) return;
     if (!selectedSegmentId || !showSegmentsUI) {
-      if (selectedPolygonLayerRef.current && mapRef.current.hasLayer(selectedPolygonLayerRef.current)) {
+      if (
+        selectedPolygonLayerRef.current &&
+        mapRef.current.hasLayer(selectedPolygonLayerRef.current)
+      ) {
         mapRef.current.removeLayer(selectedPolygonLayerRef.current);
         selectedPolygonLayerRef.current = null;
       }
@@ -1065,8 +1135,11 @@ export default function LandUseLandCover({
         if (data) {
           const extractedData = data.map((item) => ({
             id: item?.id || 0,
-            name: 'NH 152 Ambala',
-            avg_velocity: item?.avg_velocity !== undefined ? parseFloat(item.avg_velocity) : null,
+            name: "NH 152 Ambala",
+            avg_velocity:
+              item?.avg_velocity !== undefined
+                ? parseFloat(item.avg_velocity)
+                : null,
             point_count: item?.point_count || 0,
           }));
           setSegmentData(extractedData);
@@ -1387,34 +1460,38 @@ export default function LandUseLandCover({
                     const popupContent = `
                               <div style="padding: 8px; font-family: Arial, sans-serif;">
                                 <h4 style="margin: 0 0 4px 0; color: ${escapeHtml(
-                      color,
-                    )};">
+                                  color,
+                                )};">
                                   ${escapeHtml(pointName)}
                                 </h4>
-                                ${point.chainage
-                        ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Chainage:</strong> ${escapeHtml(
-                          point.chainage,
-                        )}</p>`
-                        : ""
-                      }
-                                ${point.description
-                        ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Type:</strong> ${escapeHtml(
-                          point.description,
-                        )}</p>`
-                        : ""
-                      }
-                                ${point.length
-                        ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Length:</strong> ${escapeHtml(
-                          point.length,
-                        )}</p>`
-                        : ""
-                      }
-                                ${point.detail
-                        ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Structure:</strong> ${escapeHtml(
-                          point.detail,
-                        )}</p>`
-                        : ""
-                      }
+                                ${
+                                  point.chainage
+                                    ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Chainage:</strong> ${escapeHtml(
+                                        point.chainage,
+                                      )}</p>`
+                                    : ""
+                                }
+                                ${
+                                  point.description
+                                    ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Type:</strong> ${escapeHtml(
+                                        point.description,
+                                      )}</p>`
+                                    : ""
+                                }
+                                ${
+                                  point.length
+                                    ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Length:</strong> ${escapeHtml(
+                                        point.length,
+                                      )}</p>`
+                                    : ""
+                                }
+                                ${
+                                  point.detail
+                                    ? `<p style="margin: 2px 0; font-size: 11px;"><strong>Structure:</strong> ${escapeHtml(
+                                        point.detail,
+                                      )}</p>`
+                                    : ""
+                                }
                               </div>
                             `;
 
@@ -1491,108 +1568,126 @@ export default function LandUseLandCover({
     }
   }, []);
 
-
-
-  const handleLayerToggle = useCallback(async (layerId) => {
-    if (layerId === "lulc") {
-      setShowLULC((prev) => !prev);
-      setShowSoil(false);
-    } else if (layerId === "soil") {
-      setShowSoil((prev) => {
-        const next = !prev;
-        if (next) {
-          setShowChart(false);
-          setSelectedPointForChart(null);
-          setSelectedDetailForChart(null);
-          setShowDiffChart(false);
-          setDiffPointData(null);
-          setDiffDetailData(null);
-        }
-        return next;
-      });
-      setShowLULC(false);
-    } else if (layerId === "linear") {
-      const isActive = activeLayers.includes("linear");
-      if (isActive) {
-        setActiveLayers(prev => prev.filter(id => id !== "linear"));
-        // REMOVED: setShowSegmentTable(false);
-        // REMOVED: setShowSegmentLegend(false);
-        if (liveSegmentLayerRef.current && mapRef.current?.hasLayer(liveSegmentLayerRef.current)) {
-          mapRef.current.removeLayer(liveSegmentLayerRef.current);
-          liveSegmentLayerRef.current = null;
-        }
-        if (selectedPolygonLayerRef.current && mapRef.current?.hasLayer(selectedPolygonLayerRef.current)) {
-          mapRef.current.removeLayer(selectedPolygonLayerRef.current);
-          selectedPolygonLayerRef.current = null;
-        }
-      } else {
-        setActiveLayers(prev => [...prev, "linear"]);
-
-        // Load segment data if needed
-        if (!liveSegments || !liveSegments.features || liveSegments.features.length === 0) {
-          setSegmentLoading(true);
-          try {
-            const data = await loadLiveSegments();
-            const stats = await loadSegmentStats();
-
-            if (data && data.features && data.features.length > 0) {
-              const statsById = new Map(
-                (stats || []).map((s) => [Number(s.id), s])
-              );
-
-              const extractedData = data.features.map((feature) => {
-                const id = parseInt(feature.properties?.objectid) || 0;
-                const stat = statsById.get(id);
-                return {
-                  id,
-                  name: stat?.name || feature.properties?.name || 'NH 152 Ambala',
-                  avg_velocity:
-                    stat?.avg_velocity ??
-                    (feature.properties?.avg_velocity !== undefined
-                      ? parseFloat(feature.properties.avg_velocity)
-                      : null),
-                  point_count: stat?.point_count ?? 0,
-                };
-              });
-              setSegmentData(extractedData);
-
-              if (mapRef.current && isMapReadyRef.current) {
-                setTimeout(() => {
-                  try {
-                    addLiveSegmentLayer(mapRef.current);
-                  } catch (err) {
-                    logError("[LULC] Error adding segment layer:", err);
-                  }
-                }, 100);
-              }
-            }
-          } catch (err) {
-            console.error('Error loading segments:', err);
-          } finally {
-            setSegmentLoading(false);
+  const handleLayerToggle = useCallback(
+    async (layerId) => {
+      if (layerId === "lulc") {
+        setShowLULC((prev) => !prev);
+        setShowSoil(false);
+      } else if (layerId === "soil") {
+        setShowSoil((prev) => {
+          const next = !prev;
+          if (next) {
+            setShowChart(false);
+            setSelectedPointForChart(null);
+            setSelectedDetailForChart(null);
+            setShowDiffChart(false);
+            setDiffPointData(null);
+            setDiffDetailData(null);
+          }
+          return next;
+        });
+        setShowLULC(false);
+      } else if (layerId === "linear") {
+        const isActive = activeLayers.includes("linear");
+        if (isActive) {
+          setActiveLayers((prev) => prev.filter((id) => id !== "linear"));
+          // REMOVED: setShowSegmentTable(false);
+          // REMOVED: setShowSegmentLegend(false);
+          if (
+            liveSegmentLayerRef.current &&
+            mapRef.current?.hasLayer(liveSegmentLayerRef.current)
+          ) {
+            mapRef.current.removeLayer(liveSegmentLayerRef.current);
+            liveSegmentLayerRef.current = null;
+          }
+          if (
+            selectedPolygonLayerRef.current &&
+            mapRef.current?.hasLayer(selectedPolygonLayerRef.current)
+          ) {
+            mapRef.current.removeLayer(selectedPolygonLayerRef.current);
+            selectedPolygonLayerRef.current = null;
           }
         } else {
-          if (mapRef.current && isMapReadyRef.current) {
-            setTimeout(() => {
-              try {
-                addLiveSegmentLayer(mapRef.current);
-              } catch (err) {
-                logError("[LULC] Error adding segment layer:", err);
+          setActiveLayers((prev) => [...prev, "linear"]);
+          // REMOVED: setShowSegmentTable(true);
+          // REMOVED: setShowSegmentLegend(true);
+
+          // Load segment data if needed
+          if (
+            !liveSegments ||
+            !liveSegments.features ||
+            liveSegments.features.length === 0
+          ) {
+            setSegmentLoading(true);
+            try {
+              const data = await loadLiveSegments();
+              const stats = await loadSegmentStats();
+
+              if (data && data.features && data.features.length > 0) {
+                const statsById = new Map(
+                  (stats || []).map((s) => [Number(s.id), s]),
+                );
+
+                const extractedData = data.features.map((feature) => {
+                  const id = parseInt(feature.properties?.objectid) || 0;
+                  const stat = statsById.get(id);
+                  return {
+                    id,
+                    name:
+                      stat?.name || feature.properties?.name || "NH 152 Ambala",
+                    avg_velocity:
+                      stat?.avg_velocity ??
+                      (feature.properties?.avg_velocity !== undefined
+                        ? parseFloat(feature.properties.avg_velocity)
+                        : null),
+                    point_count: stat?.point_count ?? 0,
+                  };
+                });
+                setSegmentData(extractedData);
+
+                if (mapRef.current && isMapReadyRef.current) {
+                  setTimeout(() => {
+                    try {
+                      addLiveSegmentLayer(mapRef.current);
+                    } catch (err) {
+                      logError("[LULC] Error adding segment layer:", err);
+                    }
+                  }, 100);
+                }
               }
-            }, 100);
+            } catch (err) {
+              console.error("Error loading segments:", err);
+            } finally {
+              setSegmentLoading(false);
+            }
+          } else {
+            if (mapRef.current && isMapReadyRef.current) {
+              setTimeout(() => {
+                try {
+                  addLiveSegmentLayer(mapRef.current);
+                } catch (err) {
+                  logError("[LULC] Error adding segment layer:", err);
+                }
+              }, 100);
+            }
           }
         }
+      } else {
+        setActiveLayers((prev) =>
+          prev.includes(layerId)
+            ? prev.filter((id) => id !== layerId)
+            : [...prev, layerId],
+        );
       }
-    } else {
-      setActiveLayers((prev) =>
-        prev.includes(layerId)
-          ? prev.filter((id) => id !== layerId)
-          : [...prev, layerId],
-      );
-    }
-  }, [activeLayers, liveSegments, loadLiveSegments, loadSegmentStats, addLiveSegmentLayer]);
-
-
+    },
+    [
+      activeLayers,
+      liveSegments,
+      loadLiveSegments,
+      loadSegmentStats,
+      addLiveSegmentLayer,
+    ],
+  );
 
   const handleBaseLayerChange = useCallback((layerType) => {
     setBaseLayer(layerType);
@@ -2018,7 +2113,11 @@ export default function LandUseLandCover({
       const zoomControlContainer = zoomControl.getContainer();
 
       if (zoomControlContainer) {
-        zoomControlContainer.style.setProperty("position", "static", "important");
+        zoomControlContainer.style.setProperty(
+          "position",
+          "static",
+          "important",
+        );
         zoomControlContainer.style.setProperty("margin", "0", "important");
         zoomControlContainer.style.setProperty("float", "none", "important");
         zoomControlContainer.style.setProperty("clear", "none", "important");
@@ -2148,19 +2247,28 @@ export default function LandUseLandCover({
 
         sideBySideRef.current = null;
 
-        if (soilLayerRef.current && mapRef.current?.hasLayer(soilLayerRef.current)) {
+        if (
+          soilLayerRef.current &&
+          mapRef.current?.hasLayer(soilLayerRef.current)
+        ) {
           mapRef.current.removeLayer(soilLayerRef.current);
         }
         soilLayerRef.current = null;
         soilDataRef.current = null;
         hasFitSoilBoundsRef.current = false;
 
-        if (liveSegmentLayerRef.current && mapRef.current?.hasLayer(liveSegmentLayerRef.current)) {
+        if (
+          liveSegmentLayerRef.current &&
+          mapRef.current?.hasLayer(liveSegmentLayerRef.current)
+        ) {
           mapRef.current.removeLayer(liveSegmentLayerRef.current);
           liveSegmentLayerRef.current = null;
         }
 
-        if (selectedPolygonLayerRef.current && mapRef.current?.hasLayer(selectedPolygonLayerRef.current)) {
+        if (
+          selectedPolygonLayerRef.current &&
+          mapRef.current?.hasLayer(selectedPolygonLayerRef.current)
+        ) {
           mapRef.current.removeLayer(selectedPolygonLayerRef.current);
           selectedPolygonLayerRef.current = null;
         }
@@ -2261,15 +2369,25 @@ export default function LandUseLandCover({
     if (!mapRef.current || !isMapReadyRef.current) return;
 
     if (!activeLayers.includes("linear") && !showSegmentsUI) {
-      if (liveSegmentLayerRef.current && mapRef.current.hasLayer(liveSegmentLayerRef.current)) {
+      if (
+        liveSegmentLayerRef.current &&
+        mapRef.current.hasLayer(liveSegmentLayerRef.current)
+      ) {
         mapRef.current.removeLayer(liveSegmentLayerRef.current);
         liveSegmentLayerRef.current = null;
       }
       return;
     }
 
-    if (liveSegments && liveSegments.features && liveSegments.features.length > 0) {
-      if (liveSegmentLayerRef.current && mapRef.current.hasLayer(liveSegmentLayerRef.current)) {
+    if (
+      liveSegments &&
+      liveSegments.features &&
+      liveSegments.features.length > 0
+    ) {
+      if (
+        liveSegmentLayerRef.current &&
+        mapRef.current.hasLayer(liveSegmentLayerRef.current)
+      ) {
         return;
       }
 
@@ -2286,7 +2404,13 @@ export default function LandUseLandCover({
         logError("[LULC] Error loading live segments:", err);
       });
     }
-  }, [showSegmentsUI, liveSegments, loadLiveSegments, addLiveSegmentLayer, activeLayers]);
+  }, [
+    showSegmentsUI,
+    liveSegments,
+    loadLiveSegments,
+    addLiveSegmentLayer,
+    activeLayers,
+  ]);
 
   /* ==========================================================================
    * RENDER
@@ -2339,17 +2463,15 @@ export default function LandUseLandCover({
             {/* LINEAR BUTTON - Always visible */}
             <button
               onClick={() => setShowSegmentTable(!showSegmentTable)}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 border ${showSegmentTable
-                ? "bg-purple-100 text-purple-800 border-purple-300 shadow-sm"
-                : "bg-white/80 text-gray-700 border-gray-300 hover:bg-gray-100"
-                }`}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 border ${
+                showSegmentTable
+                  ? "bg-purple-100 text-purple-800 border-purple-300 shadow-sm"
+                  : "bg-white/80 text-gray-700 border-gray-300 hover:bg-gray-100"
+              }`}
             >
               <Table size={14} />
               Linear
-
             </button>
-
-
           </div>
         </div>
 
@@ -2435,9 +2557,10 @@ export default function LandUseLandCover({
                   border-2
                   transition-all duration-200
                   hover:bg-gray-50
-                  ${isLayerPanelOpen
-                    ? "border-blue-500 bg-blue-50 text-blue-600"
-                    : "border-gray-400 text-gray-700 hover:border-gray-500"
+                  ${
+                    isLayerPanelOpen
+                      ? "border-blue-500 bg-blue-50 text-blue-600"
+                      : "border-gray-400 text-gray-700 hover:border-gray-500"
                   }
                   focus:outline-none
                   focus:ring-0
@@ -2550,7 +2673,9 @@ export default function LandUseLandCover({
                           type="radio"
                           name="baseLayer"
                           checked={baseLayer === "esri_satellite"}
-                          onChange={() => handleBaseLayerChange("esri_satellite")}
+                          onChange={() =>
+                            handleBaseLayerChange("esri_satellite")
+                          }
                           className="w-3.5 h-3.5 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer max-[480px]:w-3 max-[480px]:h-3"
                         />
                         <span>Esri Satellite</span>
@@ -2572,7 +2697,9 @@ export default function LandUseLandCover({
             <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
               <span className="text-xs font-semibold text-gray-700 flex items-center gap-2">
                 <Table size={14} />
-                Linear ({segmentData.filter(d => d.avg_velocity !== null).length} active)
+                Linear (
+                {segmentData.filter((d) => d.avg_velocity !== null).length}{" "}
+                active)
               </span>
               <button
                 onClick={() => setShowSegmentTable(false)}
@@ -2647,7 +2774,11 @@ export default function LandUseLandCover({
          * LOADING
          * -------------------------------------------------------------- */}
 
-        {(loading || flyoversLoading || movementLoading || (showSoil && soilLoading) || (showSegmentsUI && segmentLoading)) && (
+        {(loading ||
+          flyoversLoading ||
+          movementLoading ||
+          (showSoil && soilLoading) ||
+          (showSegmentsUI && segmentLoading)) && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm z-[500]">
             <div className="flex flex-col items-center gap-2 bg-white px-5 py-4 rounded-xl shadow-lg border border-gray-200 max-[480px]:px-3 max-[480px]:py-3">
               <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin max-[480px]:w-6 max-[480px]:h-6" />
@@ -2676,7 +2807,9 @@ export default function LandUseLandCover({
               size={16}
               className="flex-shrink-0 max-[480px]:w-3.5 max-[480px]:h-3.5"
             />
-            <span>{error || movementError || soilError || segmentsError.live}</span>
+            <span>
+              {error || movementError || soilError || segmentsError.live}
+            </span>
           </div>
         )}
 
@@ -2717,6 +2850,3 @@ export default function LandUseLandCover({
     </div>
   );
 }
-
-
-
