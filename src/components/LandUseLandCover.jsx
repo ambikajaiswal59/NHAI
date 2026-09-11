@@ -989,13 +989,37 @@ export default function LandUseLandCover({
       console.log(
         `Adding ${liveSegments.features.length} segment features to map`,
       );
+      const getRiskColor = (risk) => {
+        switch (risk) {
+          case 1:
+            return "#3B82F6";
+
+          case 2:
+            return "#63A0F0";
+
+          case 3:
+            return "#F97316";
+
+          case 4:
+            return "#EA580C";
+
+          case 5:
+            return "#EF4444";
+
+          default:
+            return "#64748b";
+        }
+      };
+     
 
       // Create new layer with proper GeoJSON handling
       liveSegmentLayerRef.current = L.geoJSON(liveSegments, {
         // Style for LineString features
         style: (feature) => {
+          debugger;
+          const risk = feature?.properties.risk;
           return {
-            color: "#2563eb", // Blue color
+            color: getRiskColor(risk), // Blue color
             weight: 7,
             opacity: 0.9,
             lineCap: "round",
@@ -1024,10 +1048,7 @@ export default function LandUseLandCover({
               <td style="padding: 2px 0; color: #6b7280;">ID:</td>
               <td style="padding: 2px 0; font-weight: 600;">${props.objectid || "N/A"}</td>
             </tr>
-            <tr>
-              <td style="padding: 2px 0; color: #6b7280;">Type:</td>
-              <td style="padding: 2px 0; font-weight: 600;">LineString</td>
-            </tr>
+          
             <tr>
               <td style="padding: 2px 0; color: #6b7280;">Velocity:</td>
               <td style="padding: 2px 0; font-weight: 600; color: #2563eb;">
@@ -1035,8 +1056,8 @@ export default function LandUseLandCover({
               </td>
             </tr>
             <tr>
-              <td style="padding: 2px 0; color: #6b7280;">Direction:</td>
-              <td style="padding: 2px 0; font-weight: 600;">${props.direction || "N/A"}</td>
+              <td style="padding: 2px 0; color: #6b7280;">Risk:</td>
+              <td style="padding: 2px 0; font-weight: 600;">${props.risk || "N/A"}</td>
             </tr>
             ${
               props.insert_at
@@ -1058,14 +1079,14 @@ export default function LandUseLandCover({
               layer.setStyle({
                 weight: 5,
                 opacity: 1,
-                color: "#ff6b6b",
+               
               });
               layer.openPopup();
             },
             mouseout: (e) => {
               const layer = e.target;
               layer.setStyle({
-                color: "#2563eb",
+               
                 weight: 7,
                 opacity: 0.9,
               });
