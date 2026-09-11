@@ -12,59 +12,70 @@ import {
     ReferenceLine,
 } from "recharts";
 
-// Solve a system of linear equations (Gaussian elimination with partial pivoting)
-function solveLinearSystem(A, b) {
-    const n = A.length;
-    const M = A.map((row, i) => [...row, b[i]]);
 
-    for (let col = 0; col < n; col++) {
-        let maxRow = col;
-        for (let row = col + 1; row < n; row++) {
-            if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
-        }
-        [M[col], M[maxRow]] = [M[maxRow], M[col]];
 
-        const pivot = M[col][col];
-        if (Math.abs(pivot) < 1e-12) continue;
 
-        for (let row = 0; row < n; row++) {
-            if (row === col) continue;
-            const factor = M[row][col] / pivot;
-            for (let c = col; c <= n; c++) {
-                M[row][c] -= factor * M[col][c];
-            }
-        }
-    }
-
-    return M.map((row, i) => row[n] / (row[i] || 1e-12));
-}
-
-// Fit a polynomial of given degree to (x, y) points using least squares
+// Numerically stable polynomial least-squares fit via QR decomposition
 function fitPolynomialTrend(xs, ys, degree) {
     const n = xs.length;
     const numCoeffs = degree + 1;
 
-    const XtX = Array.from({ length: numCoeffs }, () => new Array(numCoeffs).fill(0));
-    const Xty = new Array(numCoeffs).fill(0);
+    // Center and scale x — this alone hugely improves conditioning
+    const meanX = xs.reduce((a, b) => a + b, 0) / n;
+    const stdX = Math.sqrt(xs.reduce((a, b) => a + (b - meanX) ** 2, 0) / n) || 1;
+    const norm = (x) => (x - meanX) / stdX;
 
-    for (let i = 0; i < n; i++) {
-        const powers = [];
+    // Build Vandermonde matrix in normalized x
+    const A = xs.map((x) => {
+        const xn = norm(x);
+        const row = [];
         let p = 1;
-        for (let k = 0; k < numCoeffs; k++) {
-            powers.push(p);
-            p *= xs[i];
-        }
-        for (let a = 0; a < numCoeffs; a++) {
-            Xty[a] += powers[a] * ys[i];
-            for (let bIdx = 0; bIdx < numCoeffs; bIdx++) {
-                XtX[a][bIdx] += powers[a] * powers[bIdx];
-            }
+        for (let k = 0; k < numCoeffs; k++) { row.push(p); p *= xn; }
+        return row;
+    });
+
+    // Modified Gram-Schmidt QR decomposition (stable, avoids squaring condition number)
+    const Q = A.map((row) => [...row]);
+    const R = Array.from({ length: numCoeffs }, () => new Array(numCoeffs).fill(0));
+
+    for (let k = 0; k < numCoeffs; k++) {
+        let norm2 = 0;
+        for (let i = 0; i < n; i++) norm2 += Q[i][k] * Q[i][k];
+        R[k][k] = Math.sqrt(norm2) || 1e-12;
+        for (let i = 0; i < n; i++) Q[i][k] /= R[k][k];
+
+        for (let j = k + 1; j < numCoeffs; j++) {
+            let dot = 0;
+            for (let i = 0; i < n; i++) dot += Q[i][k] * Q[i][j];
+            R[k][j] = dot;
+            for (let i = 0; i < n; i++) Q[i][j] -= dot * Q[i][k];
         }
     }
 
-    const coeffs = solveLinearSystem(XtX, Xty);
-    return (x) => coeffs.reduce((sum, c, k) => sum + c * Math.pow(x, k), 0);
+    // Qᵀy
+    const Qty = new Array(numCoeffs).fill(0);
+    for (let k = 0; k < numCoeffs; k++) {
+        for (let i = 0; i < n; i++) Qty[k] += Q[i][k] * ys[i];
+    }
+
+    // Back-substitution: R * coeffs = Qty
+    const coeffs = new Array(numCoeffs).fill(0);
+    for (let k = numCoeffs - 1; k >= 0; k--) {
+        let sum = Qty[k];
+        for (let j = k + 1; j < numCoeffs; j++) sum -= R[k][j] * coeffs[j];
+        coeffs[k] = sum / (R[k][k] || 1e-12);
+    }
+
+    return (x) => {
+        const xn = norm(x);
+        let p = 1;
+        let sum = 0;
+        for (let k = 0; k < numCoeffs; k++) { sum += coeffs[k] * p; p *= xn; }
+        return sum;
+    };
 }
+
+
 
 export default function MovementPointsChart({ pointData, detailData, onClose }) {
     const [showData, setShowData] = useState(true);
@@ -200,6 +211,21 @@ export default function MovementPointsChart({ pointData, detailData, onClose }) 
     const timeseries = detailData?.data?.timeseries || [];
 
     // Compute a smooth (cubic) trend curve and merge it into the chart data
+    // const chartData = useMemo(() => {
+    //     const n = timeseries.length;
+    //     if (n === 0) return [];
+
+    //     const xs = timeseries.map((_, i) => i / Math.max(1, n - 1));
+    //     const ys = timeseries.map(d => d.displacement);
+
+    //     const degree = 5
+    //     const predict = fitPolynomialTrend(xs, ys, degree);
+
+    //     console.log(JSON.stringify(timeseries.map(d => ({ date: d.date, displacement: d.displacement }))));
+
+    //     return timeseries.map((d, i) => ({ ...d, trend: predict(xs[i]) }));
+    // }, [timeseries]);
+
     const chartData = useMemo(() => {
         const n = timeseries.length;
         if (n === 0) return [];
@@ -207,10 +233,39 @@ export default function MovementPointsChart({ pointData, detailData, onClose }) 
         const xs = timeseries.map((_, i) => i / Math.max(1, n - 1));
         const ys = timeseries.map(d => d.displacement);
 
-        const degree = Math.min(3, Math.max(1, n - 1));
+        const degree = 5;
         const predict = fitPolynomialTrend(xs, ys, degree);
 
-        return timeseries.map((d, i) => ({ ...d, trend: predict(xs[i]) }));
+        // Real data points (unchanged)
+        const realPoints = timeseries.map((d, i) => ({
+            date: d.date,
+            displacement: d.displacement,
+            trend: predict(xs[i]),
+            sortKey: xs[i],
+        }));
+
+        // Extra interpolated points, purely for a smooth trend curve
+        const SAMPLES_PER_GAP = 6; // increase for even smoother
+        const extraPoints = [];
+        const minTime = new Date(timeseries[0].date).getTime();
+        const maxTime = new Date(timeseries[n - 1].date).getTime();
+
+        for (let i = 0; i < n - 1; i++) {
+            for (let s = 1; s < SAMPLES_PER_GAP; s++) {
+                const x = xs[i] + (xs[i + 1] - xs[i]) * (s / SAMPLES_PER_GAP);
+                const t0 = new Date(timeseries[i].date).getTime();
+                const t1 = new Date(timeseries[i + 1].date).getTime();
+                const t = t0 + (t1 - t0) * (s / SAMPLES_PER_GAP);
+                extraPoints.push({
+                    date: new Date(t).toISOString().slice(0, 10),
+                    displacement: null,          // no dot/line for these
+                    trend: predict(x),
+                    sortKey: x,
+                });
+            }
+        }
+
+        return [...realPoints, ...extraPoints].sort((a, b) => a.sortKey - b.sortKey);
     }, [timeseries]);
 
     const tickInterval = Math.max(0, Math.ceil(chartData.length / 8) - 1);
@@ -358,7 +413,7 @@ export default function MovementPointsChart({ pointData, detailData, onClose }) 
 
                             {showTrend && (
                                 <Line
-                                    type="natural"
+                                    type="monotone"
                                     dataKey="trend"
                                     stroke="#3b82f6"
                                     strokeWidth={1.5}
