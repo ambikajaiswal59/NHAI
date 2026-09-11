@@ -22,7 +22,7 @@ import {
   TrafficCone,
 } from "lucide-react";
 import proj4 from "proj4";
-
+const BASE = import.meta.env.BASE_URL;
 import { loadFlyoverData } from "../utils/geoJsonParser";
 import { useWeather } from "../hooks/useWeather";
 import { useIDWWeather } from "../hooks/useIDWWeather";
@@ -230,7 +230,7 @@ export default function HomeMap() {
           try {
             mapRef.current.removeLayer(idwLayerRef.current);
             idwLayerRef.current = null;
-          } catch (e) {}
+          } catch (e) { }
         }
         preRenderStartedRef.current = false;
         clearData();
@@ -245,7 +245,7 @@ export default function HomeMap() {
 
     const loadBufferBoundary = async () => {
       try {
-        const response = await fetch("/data/AOI_Buffer.geojson");
+        const response = await fetch(`${BASE}data/AOI_Buffer.geojson`);
         if (!response.ok) {
           console.warn(`Buffer.geojson request failed: ${response.status}`);
           return;
@@ -302,7 +302,7 @@ export default function HomeMap() {
         try {
           mapRef.current?.removeLayer(idwLayerRef.current);
           idwLayerRef.current = null;
-        } catch (e) {}
+        } catch (e) { }
       }
       preRenderStartedRef.current = false;
       return;
@@ -411,7 +411,7 @@ export default function HomeMap() {
         try {
           mapRef.current.removeLayer(idwLayerRef.current);
           idwLayerRef.current = null;
-        } catch (e) {}
+        } catch (e) { }
       }
     };
   }, [
@@ -544,9 +544,8 @@ export default function HomeMap() {
   return (
     <div
       ref={mapWrapperRef}
-      className={`w-full max-w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent overflow-x-hidden ${
-        showTrafficMap ? "lg:flex-col" : "lg:flex-row"
-      }`}
+      className={`w-full max-w-full h-auto lg:h-[480px] min-h-0 flex flex-col gap-3 bg-transparent overflow-x-hidden ${showTrafficMap ? "lg:flex-col" : "lg:flex-row"
+        }`}
     >
       {/* <div className={`relative w-full max-w-full h-[320px] lg:h-auto lg:flex-1 min-w-0 min-h-[300px] rounded-xl2 overflow-hidden shadow-card ring-2 ring-gray-200 ${showTrafficMap ? 'w-full' : ''
         } ${idwLayer && months.length > 0 && !showTrafficMap ? 'pb-14' : ''}`}> */}

@@ -213,9 +213,9 @@ const Header = ({ only, onLogout, user } = {}) => {
                     {displayName}
                   </div>
 
-                  <div className="text-[10px] text-gray-500 font-semibold leading-tight">
+                  {/* <div className="text-[10px] text-gray-500 font-semibold leading-tight">
                     NHAI HQ
-                  </div>
+                  </div> */}
                 </div>
                 <ChevronDown
                   className={`w-4 h-4 text-gray-700 ml-0.5 transition-transform duration-200 ${isUserMenuOpen ? "rotate-180" : ""}`}
