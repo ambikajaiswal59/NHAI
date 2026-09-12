@@ -95,7 +95,7 @@ export default function GoogleMapComponent() {
   const availableLayers = [
     {
       id: 'flyover',
-      name: 'Flyover',
+      name: 'Assets',
       color: '#3B82F6',
       type: 'overlay'
     },

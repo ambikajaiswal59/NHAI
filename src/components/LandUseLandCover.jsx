@@ -2684,7 +2684,7 @@ export default function LandUseLandCover({
                 >
                   <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
                     <h3 className="text-xs font-semibold text-gray-700 max-[480px]:text-[10px]">
-                      Addon Layer
+                      Add-on Layer
                     </h3>
                     <button
                       onClick={() => setIsLayerPanelOpen(false)}

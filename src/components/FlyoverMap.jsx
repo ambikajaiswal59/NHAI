@@ -262,9 +262,9 @@ function BaseMapPanel({ open, setOpen, baseMap, onChange }) {
       </p>
       <div className="space-y-1.5">
         {[
-          { key: "streets", label: "Streets" },
+          { key: "streets", label: "Street" },
           { key: "satellite", label: "Google Satellite" },
-          { key: "esriSatellite", label: "Esri Satellite" },
+          // { key: "esriSatellite", label: "Esri Satellite" },
         ].map((opt) => (
           <label
             key={opt.key}
